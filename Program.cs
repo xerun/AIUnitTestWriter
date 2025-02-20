@@ -14,8 +14,11 @@ namespace AIUnitTestWriter
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration((context, config) =>
                 {
+                    var env = context.HostingEnvironment.EnvironmentName;
                     config.SetBasePath(Directory.GetCurrentDirectory())
-                          .AddJsonFile("appsettings.json", false, true);
+                          .AddJsonFile("appsettings.json", false, true)
+                          .AddJsonFile($"appsettings.{env}.json", optional: true, reloadOnChange: true)
+                          .AddEnvironmentVariables();
                 })
                 .ConfigureServices((context, services) =>
                 {

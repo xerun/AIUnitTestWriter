@@ -17,14 +17,14 @@ namespace AIUnitTestWriter.Services
         private readonly double _temperature;
         private readonly string _provider;
 
-        public AIApiService(IConfiguration configuration)
+        public AIApiService(IConfiguration configuration, HttpClient httpClient)
         {
-            _httpClient = new HttpClient();
-            
-            _apiKey = configuration["AI:ApiKey"] ?? throw new ArgumentNullException(); ;
-            _provider = configuration["AI:Provider"] ?? throw new ArgumentNullException();
-            _endpoint = configuration["AI:Endpoint"] ?? throw new ArgumentNullException();
-            _model = configuration["AI:Model"] ?? throw new ArgumentNullException();
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+
+            _apiKey = configuration["AI:ApiKey"] ?? throw new ArgumentNullException("AI:ApiKey not configured");
+            _provider = configuration["AI:Provider"] ?? throw new ArgumentNullException("AI:Provider not configured");
+            _endpoint = configuration["AI:Endpoint"] ?? throw new ArgumentNullException("AI:Endpoint not configured");
+            _model = configuration["AI:Model"] ?? throw new ArgumentNullException("AI:Model not configured");
             _maxTokens = int.TryParse(configuration["AI:MaxTokens"], out int tokens) ? tokens : 1500;
             _temperature = double.TryParse(configuration["AI:Temperature"], out double temp) ? temp : 0.2;
         }

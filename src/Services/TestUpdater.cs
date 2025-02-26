@@ -1,5 +1,4 @@
-﻿using AIUnitTestWriter.Extensions;
-using AIUnitTestWriter.Models;
+﻿using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services.Interfaces;
 
 namespace AIUnitTestWriter.Services
@@ -8,16 +7,19 @@ namespace AIUnitTestWriter.Services
     {
         private readonly IAIApiService _aiService;
         private readonly ICodeAnalyzer _codeAnalyzer;
+        private readonly IConsoleService _consoleService;
 
         private const int SourceLineThreshold = 500;
         private const int TestLineThreshold = 500;
 
         public TestUpdater(
             IAIApiService aiService,
-            ICodeAnalyzer codeAnalyzer)
+            ICodeAnalyzer codeAnalyzer,
+            IConsoleService consoleService)
         {
             _aiService = aiService;
             _codeAnalyzer = codeAnalyzer;
+            _consoleService = consoleService;
         }
 
         /// <summary>
@@ -34,7 +36,7 @@ namespace AIUnitTestWriter.Services
                 var sourceCode = File.ReadAllText(filePath);
                 if (sourceCode.Contains("interface"))
                 {
-                    "Skipped interface file.".WriteColored(ConsoleColor.DarkGray);
+                    _consoleService.WriteColored("Skipped interface file.", ConsoleColor.DarkGray);
                     return null;
                 }
 
@@ -42,7 +44,7 @@ namespace AIUnitTestWriter.Services
                 var publicMethods = _codeAnalyzer.GetPublicMethodNames(sourceCode);
                 if (publicMethods.Count == 0)
                 {
-                    "No public methods found; skipping test generation.".WriteColored(ConsoleColor.DarkGray);
+                    _consoleService.WriteColored("No public methods found; skipping test generation.", ConsoleColor.DarkGray);
                     return null;
                 }
 
@@ -53,9 +55,8 @@ namespace AIUnitTestWriter.Services
 
                 if (sourceLineCount > SourceLineThreshold)
                 {
-                    "The source file is very long.".WriteColored(ConsoleColor.Yellow);
-                    "Please enter the name of the changed method:".WriteColored(ConsoleColor.Yellow);
-                    changedMethodName = Console.ReadLine()?.Trim();
+                    _consoleService.WriteColored("The source file is very long.", ConsoleColor.Yellow);
+                    changedMethodName = _consoleService.Prompt("Please enter the name of the changed method:", ConsoleColor.Yellow);
 
                     var extractedMethod = _codeAnalyzer.GetMethodCode(sourceCode, changedMethodName);
                     if (!string.IsNullOrWhiteSpace(extractedMethod))
@@ -64,7 +65,7 @@ namespace AIUnitTestWriter.Services
                     }
                     else
                     {
-                        "Method not found; using full source.".WriteColored(ConsoleColor.Red);
+                        _consoleService.WriteColored("Method not found; using full source.", ConsoleColor.Red);
                     }
                 }
 
@@ -80,11 +81,11 @@ namespace AIUnitTestWriter.Services
                 // Build the prompt for the AI.
                 var prompt = GeneratePrompt(methodCodeToSend, existingTests, sampleUnitTest);
 
-                "Sending code to AI for test generation...".WriteColored(ConsoleColor.Blue);
+                _consoleService.WriteColored("Sending code to AI for test generation...", ConsoleColor.Blue);
                 var aiResponse = await _aiService.GenerateTestsAsync(prompt);
                 if (string.IsNullOrWhiteSpace(aiResponse))
                 {
-                    "AI returned an empty response.".WriteColored(ConsoleColor.Yellow);
+                    _consoleService.WriteColored("AI returned an empty response.", ConsoleColor.Yellow);
                     return null;
                 }
 
@@ -92,7 +93,7 @@ namespace AIUnitTestWriter.Services
                 var tempFileName = Path.GetFileNameWithoutExtension(testFilePath) + "_temp" + Path.GetExtension(testFilePath);
                 var tempFilePath = Path.Combine(Path.GetTempPath(), tempFileName);
                 File.WriteAllText(tempFilePath, aiResponse);
-                $"Generated test file saved to temporary file: {tempFilePath}".WriteColored(ConsoleColor.Green);
+                _consoleService.WriteColored($"Generated test file saved to temporary file: {tempFilePath}", ConsoleColor.Green);
 
                 // Optionally, try to open the temporary file.
                 try
@@ -105,7 +106,7 @@ namespace AIUnitTestWriter.Services
                 }
                 catch (Exception ex)
                 {
-                    ("Unable to open the temporary file automatically: " + ex.Message).WriteColored(ConsoleColor.Red);
+                    _consoleService.WriteColored(("Unable to open the temporary file automatically: " + ex.Message), ConsoleColor.Red);
                 }
 
                 if (!promptUser)
@@ -118,8 +119,8 @@ namespace AIUnitTestWriter.Services
                     };
                     // Auto mode: finalize immediately.
                     FinalizeTestUpdate(result);
-                    $"Test file auto-updated at: {testFilePath}".WriteColored(ConsoleColor.Green);
-                    "Auto-detect mode activated. Monitoring code changes.".WriteColored(ConsoleColor.Blue);
+                    _consoleService.WriteColored($"Test file auto-updated at: {testFilePath}", ConsoleColor.Green);
+                    _consoleService.WriteColored("Auto-detect mode activated. Monitoring code changes.", ConsoleColor.Blue);
                     return null;
                 }
                 else
@@ -134,7 +135,7 @@ namespace AIUnitTestWriter.Services
             }
             catch (Exception ex)
             {
-                ex.Message.WriteColored(ConsoleColor.Red);
+                _consoleService.WriteColored(ex.Message, ConsoleColor.Red);
                 return null;
             }
         }

@@ -27,6 +27,7 @@ namespace AIUnitTestWriter.Services
             _testUpdater = testUpdater;
         }
 
+        /// <inheritdoc/>
         public void Start(string srcFolder, string testsFolder, string sampleUnitTest = "", bool promptUser = true)
         {
             _srcFolder = srcFolder;
@@ -46,6 +47,7 @@ namespace AIUnitTestWriter.Services
             _watcher.EnableRaisingEvents = true;
         }
 
+        /// <inheritdoc/>
         public void Stop()
         {
             if (_watcher != null)

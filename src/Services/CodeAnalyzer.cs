@@ -8,9 +8,7 @@ namespace AIUnitTestWriter.Services
 {
     public class CodeAnalyzer : ICodeAnalyzer
     {
-        /// <summary>
-        /// Returns the code of the method with the given name.
-        /// </summary>
+        /// <inheritdoc/>
         public string GetMethodCode(string sourceCode, string methodName)
         {
             var tree = CSharpSyntaxTree.ParseText(sourceCode);
@@ -27,9 +25,7 @@ namespace AIUnitTestWriter.Services
             return null;
         }
 
-        /// <summary>
-        /// Filters and returns test methods that start with the specified method name.
-        /// </summary>
+        /// <inheritdoc/>
         public string FilterTestMethods(string testCode, string methodName)
         {
             var tree = CSharpSyntaxTree.ParseText(testCode);
@@ -47,9 +43,7 @@ namespace AIUnitTestWriter.Services
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Returns a list of public method names from the source code.
-        /// </summary>
+        /// <inheritdoc/>
         public List<string> GetPublicMethodNames(string sourceCode)
         {
             var methodNames = new List<string>();

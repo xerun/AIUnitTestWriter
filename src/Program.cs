@@ -32,6 +32,7 @@ namespace AIUnitTestWriter
                     services.AddSingleton<ICodeMonitor, CodeMonitor>();
                     services.AddTransient<ITestUpdater, TestUpdater>();
                     services.AddSingleton<ICodeAnalyzer, CodeAnalyzer>();
+                    services.AddSingleton<IGitIntegrationService, GitIntegrationService>();
 
                     // Register the Application runner.
                     services.AddSingleton<AppStarter>();

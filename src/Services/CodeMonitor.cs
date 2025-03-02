@@ -5,29 +5,22 @@ namespace AIUnitTestWriter.Services
     public class CodeMonitor : ICodeMonitor
     {
         private readonly ITestUpdater _testUpdater;
-        private FileSystemWatcher? _watcher;
-
-        // Dictionary to hold timers for each file path.
+        private readonly IFileWatcherWrapper _fileWatcher;
         private readonly Dictionary<string, Timer> _debounceTimers = new();
-
-        // Debounce interval: adjust as needed.
+        private readonly object _timerLock = new();
         private readonly TimeSpan _debounceInterval = TimeSpan.FromSeconds(1);
 
-        // Lock object for thread safety.
-        private readonly object _timerLock = new();
-
-        // Configuration variables set in Start()
         private string _srcFolder = string.Empty;
         private string _testsFolder = string.Empty;
         private string _sampleUnitTest = string.Empty;
         private bool _promptUser = true;
 
-        public CodeMonitor(ITestUpdater testUpdater)
+        public CodeMonitor(ITestUpdater testUpdater, IFileWatcherWrapper fileWatcher)
         {
-            _testUpdater = testUpdater;
+            _testUpdater = testUpdater ?? throw new ArgumentNullException(nameof(testUpdater));
+            _fileWatcher = fileWatcher ?? throw new ArgumentNullException(nameof(fileWatcher));
         }
 
-        /// <inheritdoc/>
         public void Start(string srcFolder, string testsFolder, string sampleUnitTest = "", bool promptUser = true)
         {
             _srcFolder = srcFolder;
@@ -35,27 +28,18 @@ namespace AIUnitTestWriter.Services
             _sampleUnitTest = sampleUnitTest;
             _promptUser = promptUser;
 
-            _watcher = new FileSystemWatcher(_srcFolder, "*.cs")
-            {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime
-            };
+            _fileWatcher.Changed += OnChanged;
+            _fileWatcher.Created += OnChanged;
+            _fileWatcher.Renamed += OnRenamed;
 
-            _watcher.Changed += OnChanged;
-            _watcher.Created += OnChanged;
-            _watcher.Renamed += OnRenamed;
-            _watcher.EnableRaisingEvents = true;
+            _fileWatcher.Start(_srcFolder, "*.cs");
+            _fileWatcher.EnableRaisingEvents = true;
         }
 
-        /// <inheritdoc/>
         public void Stop()
         {
-            if (_watcher != null)
-            {
-                _watcher.EnableRaisingEvents = false;
-                _watcher.Dispose();
-                _watcher = null;
-            }
+            _fileWatcher.EnableRaisingEvents = false;
+            _fileWatcher.Stop();
         }
 
         private void OnChanged(object sender, FileSystemEventArgs e)
@@ -74,13 +58,11 @@ namespace AIUnitTestWriter.Services
             {
                 if (_debounceTimers.TryGetValue(filePath, out var existingTimer))
                 {
-                    // Reset the existing timer.
                     existingTimer.Change(_debounceInterval, Timeout.InfiniteTimeSpan);
                 }
                 else
                 {
-                    // Create a new timer that fires once after the debounce interval.
-                    Timer timer = new Timer(_ =>
+                    var timer = new Timer(_ =>
                     {
                         try
                         {
@@ -89,11 +71,7 @@ namespace AIUnitTestWriter.Services
                         }
                         finally
                         {
-                            // Remove the timer after processing.
-                            lock (_timerLock)
-                            {
-                                _debounceTimers.Remove(filePath);
-                            }
+                            lock (_timerLock) { _debounceTimers.Remove(filePath); }
                         }
                     }, null, _debounceInterval, Timeout.InfiniteTimeSpan);
 

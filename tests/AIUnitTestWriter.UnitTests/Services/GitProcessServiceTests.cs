@@ -1,87 +1,76 @@
-﻿using AIUnitTestWriter.Services;
+﻿using AIUnitTestWriter.Services.Git;
+using AIUnitTestWriter.Services.Interfaces;
+using Moq;
 using System.Diagnostics;
-using System.Text;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
     public class GitProcessServiceTests
     {
+        private readonly Mock<IGitProcessFactory> _processFactory;
+        private readonly Mock<IProcessWrapper> _mockProcess;
+        private readonly GitProcessService _gitProcessService;
+
+        public GitProcessServiceTests()
+        {
+            _processFactory = new Mock<IGitProcessFactory>();
+            _mockProcess = new Mock<IProcessWrapper>();
+            _gitProcessService = new GitProcessService(_processFactory.Object);
+        }
+
         [Fact]
-        public void RunCommand_ShouldReturnOutput_WhenGitCommandSucceeds()
+        public void RunCommand_ShouldReturnOutput_WhenCommandSucceeds()
         {
             // Arrange
-            var expectedOutput = "Success output";
-            var gitProcessService = new GitProcessService();
             var command = "status";
-            var workingDirectory = "/fake/path";
+            var workingDirectory = @"C:\repo";
+            var expectedOutput = "On branch main\nnothing to commit, working tree clean";
 
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "git",
-                    Arguments = command,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = workingDirectory
-                }
-            };
+            _mockProcess.Setup(p => p.StandardOutput).Returns(new StreamReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(expectedOutput))));
+            _mockProcess.Setup(p => p.StandardError).Returns(new StreamReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(string.Empty))));
+            _mockProcess.Setup(p => p.ExitCode).Returns(0);
+            _mockProcess.Setup(p => p.WaitForExit());
 
-            var outputStream = new MemoryStream(Encoding.UTF8.GetBytes(expectedOutput));
-            var errorStream = new MemoryStream();
-
-            var outputReader = new StreamReader(outputStream);
-            var errorReader = new StreamReader(errorStream);
-
-            typeof(Process).GetProperty("StandardOutput")!.SetValue(process, outputReader);
-            typeof(Process).GetProperty("StandardError")!.SetValue(process, errorReader);
+            _processFactory.Setup(f => f.StartProcess(It.IsAny<ProcessStartInfo>())).Returns(_mockProcess.Object);
 
             // Act
-            var result = gitProcessService.RunCommand(command, workingDirectory);
+            var result = _gitProcessService.RunCommand(command, workingDirectory);
 
             // Assert
             Assert.Equal(expectedOutput, result);
         }
 
         [Fact]
-        public void RunCommand_ShouldReturnErrorOutput_WhenGitCommandFails()
+        public void RunCommand_ShouldThrowException_WhenProcessCannotStart()
         {
             // Arrange
-            var expectedError = "Error: Something went wrong";
-            var gitProcessService = new GitProcessService();
-            var command = "checkout invalid-branch";
-            var workingDirectory = "/fake/path";
+            var command = "status";
+            var workingDirectory = @"C:\repo";
 
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "git",
-                    Arguments = command,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = workingDirectory
-                }
-            };
+            _processFactory.Setup(f => f.StartProcess(It.IsAny<ProcessStartInfo>())).Returns((IProcessWrapper)null);
 
-            var outputStream = new MemoryStream();
-            var errorStream = new MemoryStream(Encoding.UTF8.GetBytes(expectedError));
+            // Act & Assert
+            Assert.Throws<InvalidOperationException>(() => _gitProcessService.RunCommand(command, workingDirectory));
+        }
 
-            var outputReader = new StreamReader(outputStream);
-            var errorReader = new StreamReader(errorStream);
+        [Fact]
+        public void RunCommand_ShouldThrowException_WhenCommandFails()
+        {
+            // Arrange
+            var command = "status";
+            var workingDirectory = @"C:\repo";
+            var errorMessage = "fatal: Not a git repository (or any of the parent directories): .git";
 
-            typeof(Process).GetProperty("StandardOutput")!.SetValue(process, outputReader);
-            typeof(Process).GetProperty("StandardError")!.SetValue(process, errorReader);
+            _mockProcess.Setup(p => p.StandardOutput).Returns(new StreamReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(string.Empty))));
+            _mockProcess.Setup(p => p.StandardError).Returns(new StreamReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(errorMessage))));
+            _mockProcess.Setup(p => p.ExitCode).Returns(1);
+            _mockProcess.Setup(p => p.WaitForExit());
 
-            // Act
-            var result = gitProcessService.RunCommand(command, workingDirectory);
+            _processFactory.Setup(f => f.StartProcess(It.IsAny<ProcessStartInfo>())).Returns(_mockProcess.Object);
 
-            // Assert
-            Assert.Equal(expectedError, result);
+            // Act & Assert
+            var exception = Assert.Throws<Exception>(() => _gitProcessService.RunCommand(command, workingDirectory));
+            Assert.Equal($"Git Error: {errorMessage}", exception.Message);
         }
     }
 }

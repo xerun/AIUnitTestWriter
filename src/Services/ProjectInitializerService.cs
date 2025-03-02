@@ -1,18 +1,21 @@
 ﻿using AIUnitTestWriter.Models;
+using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Services.Interfaces;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace AIUnitTestWriter.Services
 {
     public class ProjectInitializerService : IProjectInitializer
-    {
-        private readonly IConfiguration _configuration;
+    {        
         private readonly IConsoleService _consoleService;
+        private readonly ProjectSettings _projectSettings;
+        private readonly GitSettings _gitSettings;
 
-        public ProjectInitializerService(IConfiguration configuration, IConsoleService consoleService)
+        public ProjectInitializerService(IOptions<ProjectSettings> projectSettings, IOptions<GitSettings> gitSettings, IConsoleService consoleService)
         {
-            _configuration = configuration;
-            _consoleService = consoleService;
+            _projectSettings = projectSettings?.Value ?? throw new ArgumentNullException(nameof(projectSettings));
+            _gitSettings = gitSettings?.Value ?? throw new ArgumentNullException(nameof(gitSettings));
+            _consoleService = consoleService ?? throw new ArgumentNullException(nameof(consoleService));
         }
 
         public ProjectConfigModel Initialize()
@@ -35,16 +38,12 @@ namespace AIUnitTestWriter.Services
                 // It's a Git repository URL.
                 config.IsGitRepository = true;
                 config.GitRepositoryUrl = config.ProjectPath;
-
-                // Ask for a local path where the repository should be cloned.
-                config.ProjectPath = _consoleService.Prompt(
-                    "Enter the local path where the repository should be cloned:",
-                    ConsoleColor.Cyan);
+                config.ProjectPath = _gitSettings.LocalRepositoryPath;
 
                 // If the directory does not exist, create it.
-                if (!Directory.Exists(config.ProjectPath))
+                if (!Directory.Exists(_gitSettings.LocalRepositoryPath))
                 {
-                    Directory.CreateDirectory(config.ProjectPath);
+                    Directory.CreateDirectory(_gitSettings.LocalRepositoryPath);
                 }
             }
             else
@@ -53,22 +52,34 @@ namespace AIUnitTestWriter.Services
                 return Initialize(); // Re-prompt if input is invalid.
             }
 
-            var srcFolderName = _configuration["Project:SourceFolder"] ?? "src";
-            var testsFolderName = _configuration["Project:TestsFolder"] ?? "tests";
+            var srcFolderName = _projectSettings.SourceFolder ?? throw new ArgumentException(nameof(_projectSettings.SourceFolder));
+            var testsFolderName = _projectSettings.TestsFolder ?? throw new ArgumentException(nameof(_projectSettings.TestsFolder));
             config.SrcFolder = Path.Combine(config.ProjectPath, srcFolderName);
             config.TestsFolder = Path.Combine(config.ProjectPath, testsFolderName);
 
             string sampleResponse = _consoleService.Prompt("Would you like to provide a sample unit test file for reference? (Y/N)", ConsoleColor.DarkYellow);
+            int retryCount = 0;
+            int maxRetries = 3; // Limit retries for testability
             if (sampleResponse.Equals("y", StringComparison.OrdinalIgnoreCase) ||
                 sampleResponse.Equals("yes", StringComparison.OrdinalIgnoreCase))
             {
                 string sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
-                while (string.IsNullOrWhiteSpace(sampleFilePath) || !File.Exists(sampleFilePath))
+                while ((string.IsNullOrWhiteSpace(sampleFilePath) || !File.Exists(sampleFilePath)) && retryCount < maxRetries)
                 {
                     _consoleService.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red);
                     sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
+                    retryCount++;
                 }
-                config.SampleUnitTestContent = File.ReadAllText(sampleFilePath);
+                
+                if (retryCount == maxRetries && string.IsNullOrWhiteSpace(sampleFilePath))
+                {
+                    _consoleService.WriteColored("Maximum retry limit reached. Skipping sample file selection.", ConsoleColor.Red);
+                    config.SampleUnitTestContent = string.Empty;
+                }
+                else
+                {
+                    config.SampleUnitTestContent = File.ReadAllText(sampleFilePath);
+                }
             }
             else
             {

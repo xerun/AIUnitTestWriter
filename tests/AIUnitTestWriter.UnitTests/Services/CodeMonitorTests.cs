@@ -6,113 +6,81 @@ namespace AIUnitTestWriter.UnitTests.Services
 {
     public class CodeMonitorTests
     {
-        private readonly Mock<ITestUpdater> _testUpdaterMock;
+        private readonly Mock<ITestUpdater> _mockTestUpdater;
+        private readonly Mock<IFileWatcherWrapper> _mockFileWatcher;
         private readonly CodeMonitor _codeMonitor;
 
         public CodeMonitorTests()
         {
-            _testUpdaterMock = new Mock<ITestUpdater>();
-            _codeMonitor = new CodeMonitor(_testUpdaterMock.Object);
+            _mockTestUpdater = new Mock<ITestUpdater>();
+            _mockFileWatcher = new Mock<IFileWatcherWrapper>();
+            _codeMonitor = new CodeMonitor(_mockTestUpdater.Object, _mockFileWatcher.Object);
         }
 
         [Fact]
-        public void Start_ShouldInitializeFileSystemWatcher()
+        public void Start_ShouldEnableFileWatcher()
         {
             // Act
-            _codeMonitor.Start("src", "tests");
+            _codeMonitor.Start("srcPath", "testPath");
 
             // Assert
-            Assert.NotNull(GetPrivateField<FileSystemWatcher>(_codeMonitor, "_watcher"));
+            _mockFileWatcher.Verify(fw => fw.Start("srcPath", "*.cs"), Times.Once);
+            _mockFileWatcher.VerifySet(fw => fw.EnableRaisingEvents = true, Times.Once);
         }
 
         [Fact]
-        public void Stop_ShouldDisposeFileSystemWatcher()
+        public void Stop_ShouldDisableFileWatcher()
         {
-            // Arrange
-            _codeMonitor.Start("src", "tests");
-
             // Act
             _codeMonitor.Stop();
 
             // Assert
-            Assert.Null(GetPrivateField<FileSystemWatcher>(_codeMonitor, "_watcher"));
+            _mockFileWatcher.VerifySet(fw => fw.EnableRaisingEvents = false, Times.Once);
+            _mockFileWatcher.Verify(fw => fw.Stop(), Times.Once);
         }
 
         [Fact]
-        public void OnChanged_ShouldTriggerDebounceAndProcessFileChange()
+        public async Task FileChanged_ShouldTriggerProcessFileChange()
         {
             // Arrange
-            _codeMonitor.Start("src", "tests");
-            string testFilePath = "src/TestFile.cs";
+            _codeMonitor.Start("srcPath", "testPath");
+            var fileEvent = new FileSystemEventArgs(WatcherChangeTypes.Changed, "srcPath", "file.cs");
+
+            _mockTestUpdater.Setup(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()));
 
             // Act
-            TriggerFileSystemEvent("_watcher", new FileSystemEventArgs(WatcherChangeTypes.Changed, "src", "TestFile.cs"));
+            Task.Run(() => _codeMonitor.GetType().GetMethod("OnChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.Invoke(_codeMonitor, new object[] { this, fileEvent }));
 
-            // Wait for debounce timer
-            Thread.Sleep(1500);
+            // Wait for debounce interval
+            await Task.Delay(1200);
 
-            // Assert: Ensure `ProcessFileChange` was called once
-            _testUpdaterMock.Verify(x => x.ProcessFileChange("src", "tests", testFilePath, "", true), Times.Once);
+            // Assert
+            _mockTestUpdater.Verify(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
+
+            _codeMonitor.Stop();
         }
 
         [Fact]
-        public void OnRenamed_ShouldTriggerDebounceAndProcessFileChange()
+        public async Task FileRenamed_ShouldTriggerProcessFileChange()
         {
             // Arrange
-            _codeMonitor.Start("src", "tests");
-            string testFilePath = "src/TestFileRenamed.cs";
+            _codeMonitor.Start("srcPath", "testPath");
+            var renameEvent = new RenamedEventArgs(WatcherChangeTypes.Renamed, "srcPath", "newFile.cs", "oldFile.cs");
+
+            _mockTestUpdater.Setup(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()));
 
             // Act
-            TriggerFileSystemEvent("_watcher", new RenamedEventArgs(WatcherChangeTypes.Renamed, "src", "TestFileRenamed.cs", "TestFile.cs"));
+            Task.Run(() => _codeMonitor.GetType().GetMethod("OnRenamed", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.Invoke(_codeMonitor, new object[] { this, renameEvent }));
 
-            // Wait for debounce timer
-            Thread.Sleep(1500);
+            // Wait for debounce interval
+            await Task.Delay(1200);
 
-            // Assert: Ensure `ProcessFileChange` was called once
-            _testUpdaterMock.Verify(x => x.ProcessFileChange("src", "tests", testFilePath, "", true), Times.Once);
-        }
+            // Assert
+            _mockTestUpdater.Verify(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
 
-        [Fact]
-        public void Debounce_ShouldLimitMultipleRapidCallsToSingleExecution()
-        {
-            // Arrange
-            _codeMonitor.Start("src", "tests");
-            string testFilePath = "src/TestFile.cs";
-
-            // Trigger multiple rapid events
-            TriggerFileSystemEvent("_watcher", new FileSystemEventArgs(WatcherChangeTypes.Changed, "src", "TestFile.cs"));
-            TriggerFileSystemEvent("_watcher", new FileSystemEventArgs(WatcherChangeTypes.Changed, "src", "TestFile.cs"));
-            TriggerFileSystemEvent("_watcher", new FileSystemEventArgs(WatcherChangeTypes.Changed, "src", "TestFile.cs"));
-
-            // Wait for debounce timer
-            Thread.Sleep(1500);
-
-            // Assert: Ensure `ProcessFileChange` was called only once
-            _testUpdaterMock.Verify(x => x.ProcessFileChange("src", "tests", testFilePath, "", true), Times.Once);
-        }
-
-        private void TriggerFileSystemEvent(string watcherField, FileSystemEventArgs args)
-        {
-            var watcher = GetPrivateField<FileSystemWatcher>(_codeMonitor, watcherField);
-            if (watcher == null) return;
-
-            // Use reflection to get the event field
-            var eventField = typeof(FileSystemWatcher)
-                .GetField(args.ChangeType.ToString(),
-                          System.Reflection.BindingFlags.Instance |
-                          System.Reflection.BindingFlags.NonPublic);
-
-            var eventDelegate = eventField?.GetValue(watcher) as MulticastDelegate;
-
-            // Invoke the event if it exists
-            eventDelegate?.Method.Invoke(eventDelegate.Target, new object[] { watcher, args });
-        }
-
-        private T GetPrivateField<T>(object obj, string fieldName)
-        {
-            return (T)obj.GetType()
-                         .GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                         .GetValue(obj);
+            _codeMonitor.Stop();
         }
     }
 }

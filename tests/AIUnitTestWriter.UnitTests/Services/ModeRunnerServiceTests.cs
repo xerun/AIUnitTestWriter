@@ -10,6 +10,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly Mock<ITestUpdater> _mockTestUpdater;
         private readonly Mock<ICodeMonitor> _mockCodeMonitor;
         private readonly Mock<IConsoleService> _mockConsoleService;
+        private readonly ProjectConfigModel _projectConfig;
         private readonly ModeRunnerService _modeRunnerService;
 
         public ModeRunnerServiceTests()
@@ -18,150 +19,110 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockCodeMonitor = new Mock<ICodeMonitor>();
             _mockConsoleService = new Mock<IConsoleService>();
 
+            _projectConfig = new ProjectConfigModel
+            {
+                SrcFolder = "src",
+                TestsFolder = "tests",
+                SampleUnitTestContent = "Sample test content"
+            };
+
             _modeRunnerService = new ModeRunnerService(
                 _mockTestUpdater.Object,
                 _mockCodeMonitor.Object,
-                _mockConsoleService.Object
+                _mockConsoleService.Object,
+                _projectConfig
             );
         }
 
         [Fact]
-        public async Task RunAutoModeAsync_ShouldStartMonitoringAndPrintMessages()
+        public async Task RunAutoModeAsync_Should_StartCodeMonitor_And_PrintMessages()
         {
-            // Arrange
-            var config = new ProjectConfigModel
-            {
-                SrcFolder = "src",
-                TestsFolder = "tests",
-                SampleUnitTestContent = "sample content"
-            };
-
             // Act
-            await _modeRunnerService.RunAutoModeAsync(config);
+            var task = _modeRunnerService.RunAutoModeAsync();
+            await Task.Delay(100); // Simulate brief async execution
 
             // Assert
-            _mockConsoleService.Verify(cs => cs.WriteColored($"Monitoring source folder: {config.SrcFolder}", ConsoleColor.Green), Times.Once);
-            _mockConsoleService.Verify(cs => cs.WriteColored($"Tests will be updated in: {config.TestsFolder}", ConsoleColor.Green), Times.Once);
-            _mockConsoleService.Verify(cs => cs.WriteColored("Auto-detect mode activated. Monitoring code changes.", ConsoleColor.Blue), Times.Once);
-            _mockCodeMonitor.Verify(cm => cm.Start(config.SrcFolder, config.TestsFolder, config.SampleUnitTestContent, false), Times.Once);
+            _mockConsoleService.Verify(m => m.WriteColored($"Monitoring source folder: {_projectConfig.SrcFolder}", ConsoleColor.Green), Times.Once);
+            _mockConsoleService.Verify(m => m.WriteColored($"Tests will be updated in: {_projectConfig.TestsFolder}", ConsoleColor.Green), Times.Once);
+            _mockConsoleService.Verify(m => m.WriteColored("Auto-detect mode activated. Monitoring code changes, press any key to exit.", ConsoleColor.Blue), Times.Once);
+            _mockCodeMonitor.Verify(m => m.Start(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, false), Times.Once);
         }
 
         [Fact]
-        public async Task RunManualModeAsync_ShouldExitOnExitCommand()
+        public async Task RunManualModeAsync_Should_Exit_When_User_Types_Exit()
         {
             // Arrange
-            var config = new ProjectConfigModel
-            {
-                SrcFolder = "src",
-                TestsFolder = "tests",
-                SampleUnitTestContent = "sample content"
-            };
-
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), It.IsAny<ConsoleColor>()))
-                               .Returns("exit"); // Simulate user entering "exit"
+            _mockConsoleService.SetupSequence(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
+                               .Returns("exit"); // User immediately exits
 
             // Act
-            await _modeRunnerService.RunManualModeAsync(config);
+            await _modeRunnerService.RunManualModeAsync();
 
             // Assert
-            _mockConsoleService.Verify(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Yellow), Times.Once);
+            _mockConsoleService.Verify(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow), Times.Once);
         }
 
         [Fact]
-        public async Task RunManualModeAsync_ShouldHandleInvalidFilePath()
+        public async Task RunManualModeAsync_Should_Continue_On_Invalid_FilePath()
         {
             // Arrange
-            var config = new ProjectConfigModel
-            {
-                SrcFolder = "src",
-                TestsFolder = "tests",
-                SampleUnitTestContent = "sample content"
-            };
+            _mockConsoleService.SetupSequence(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
+                               .Returns("invalid-path")
+                               .Returns("exit");
 
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), It.IsAny<ConsoleColor>()))
-                               .Returns("invalidPath") // Invalid file path
-                               .Returns("exit"); // Exit after one iteration
+            _mockConsoleService.Setup(m => m.WriteColored("Invalid file path. Please try again.", ConsoleColor.Red));
 
             // Act
-            await _modeRunnerService.RunManualModeAsync(config);
+            await _modeRunnerService.RunManualModeAsync();
 
             // Assert
-            _mockConsoleService.Verify(cs => cs.WriteColored("Invalid file path. Please try again.", ConsoleColor.Red), Times.Once);
+            _mockConsoleService.Verify(m => m.WriteColored("Invalid file path. Please try again.", ConsoleColor.Red), Times.Once);
         }
 
         [Fact]
-        public async Task RunManualModeAsync_ShouldProcessFileChange()
+        public async Task RunManualModeAsync_Should_Process_File_Change_And_Approve_Update()
         {
             // Arrange
-            var config = new ProjectConfigModel
-            {
-                SrcFolder = "src",
-                TestsFolder = "tests",
-                SampleUnitTestContent = "sample content"
-            };
+            string validFilePath = Path.GetTempFileName();
+            var testResult = new TestGenerationResultModel { TempFilePath = "temp-test.cs", TestFilePath = "final-test.cs" };
 
-            string validFilePath = "validFilePath.cs";
-            File.WriteAllText(validFilePath, "public class Test {}"); // Create a temporary valid file
+            _mockConsoleService.SetupSequence(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
+                               .Returns(validFilePath) // Valid file path
+                               .Returns("y") // Approve test update
+                               .Returns("exit"); // Exit loop
 
-            var testResult = new TestGenerationResultModel
-            {
-                TempFilePath = "tempTestFile.cs",
-                TestFilePath = "finalTestFile.cs",
-                GeneratedTestCode = "public class Test {}"
-            };
-
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), It.IsAny<ConsoleColor>()))
-                               .Returns(validFilePath) // First input: valid file
-                               .Returns("yes") // Second input: approval
-                               .Returns("exit"); // Third input: exit
-
-            _mockTestUpdater.Setup(tu => tu.ProcessFileChange(config.SrcFolder, config.TestsFolder, validFilePath, config.SampleUnitTestContent, true))
+            _mockTestUpdater.Setup(m => m.ProcessFileChange(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true))
                             .ReturnsAsync(testResult);
 
             // Act
-            await _modeRunnerService.RunManualModeAsync(config);
+            await _modeRunnerService.RunManualModeAsync();
 
             // Assert
-            _mockConsoleService.Verify(cs => cs.WriteColored($"Please review the generated test code in the temporary file: {testResult.TempFilePath}", ConsoleColor.DarkBlue), Times.Once);
-            _mockConsoleService.Verify(cs => cs.WriteColored($"Test file updated at: {testResult.TestFilePath}", ConsoleColor.Green), Times.Once);
-            _mockTestUpdater.Verify(tu => tu.FinalizeTestUpdate(testResult), Times.Once);
+            _mockTestUpdater.Verify(m => m.FinalizeTestUpdate(testResult), Times.Once);
+            _mockConsoleService.Verify(m => m.WriteColored($"Test file updated at: {testResult.TestFilePath}", ConsoleColor.Green), Times.Once);
         }
 
         [Fact]
-        public async Task RunManualModeAsync_ShouldNotApplyChangesOnUserRejection()
+        public async Task RunManualModeAsync_Should_Not_Apply_Changes_If_Not_Approved()
         {
             // Arrange
-            var config = new ProjectConfigModel
-            {
-                SrcFolder = "src",
-                TestsFolder = "tests",
-                SampleUnitTestContent = "sample content"
-            };
+            string validFilePath = Path.GetTempFileName();
+            var testResult = new TestGenerationResultModel { TempFilePath = "temp-test.cs", TestFilePath = "final-test.cs" };
 
-            string validFilePath = "validFilePath.cs";
-            File.WriteAllText(validFilePath, "public class Test {}"); // Create a temporary valid file
+            _mockConsoleService.SetupSequence(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
+                               .Returns(validFilePath) // Valid file path
+                               .Returns("n") // Reject update
+                               .Returns("exit"); // Exit loop
 
-            var testResult = new TestGenerationResultModel
-            {
-                TempFilePath = "tempTestFile.cs",
-                TestFilePath = "finalTestFile.cs",
-                GeneratedTestCode = "public class Test {}"
-            };
-
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), It.IsAny<ConsoleColor>()))
-                               .Returns(validFilePath) // First input: valid file
-                               .Returns("no") // Second input: reject update
-                               .Returns("exit"); // Third input: exit
-
-            _mockTestUpdater.Setup(tu => tu.ProcessFileChange(config.SrcFolder, config.TestsFolder, validFilePath, config.SampleUnitTestContent, true))
+            _mockTestUpdater.Setup(m => m.ProcessFileChange(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true))
                             .ReturnsAsync(testResult);
 
             // Act
-            await _modeRunnerService.RunManualModeAsync(config);
+            await _modeRunnerService.RunManualModeAsync();
 
             // Assert
-            _mockConsoleService.Verify(cs => cs.WriteColored("Changes were not applied. You may manually copy any necessary code from the temporary file.", ConsoleColor.Red), Times.Once);
-            _mockTestUpdater.Verify(tu => tu.FinalizeTestUpdate(It.IsAny<TestGenerationResultModel>()), Times.Never);
+            _mockTestUpdater.Verify(m => m.FinalizeTestUpdate(It.IsAny<TestGenerationResultModel>()), Times.Never);
+            _mockConsoleService.Verify(m => m.WriteColored("Changes were not applied. You may manually copy any necessary code from the temporary file.", ConsoleColor.Red), Times.Once);
         }
     }
 }

@@ -1,8 +1,12 @@
 ﻿using AIUnitTestWriter.Services;
+using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Octokit;
+using System.IO.Abstractions;
 
 namespace AIUnitTestWriter
 {
@@ -23,16 +27,34 @@ namespace AIUnitTestWriter
                 .ConfigureServices((context, services) =>
                 {
                     // Register configuration
-                    services.AddSingleton<IConfiguration>(context.Configuration);
+                    services.AddSingleton(context.Configuration);
+
+                    services.AddHttpClient();
+
+                    services.Configure<ProjectSettings>(context.Configuration.GetSection("Project"));
+                    services.Configure<AISettings>(context.Configuration.GetSection("AI"));
+                    services.Configure<GitSettings>(context.Configuration.GetSection("Git"));
 
                     // Register your services.
                     services.AddSingleton<IProjectInitializer, ProjectInitializerService>();
+                    services.AddSingleton(provider =>
+                    {
+                        var initializer = provider.GetRequiredService<IProjectInitializer>();
+                        return initializer.Initialize();
+                    });                    
+                    services.AddSingleton<IGitProcessFactory, GitProcessFactory>();
+                    services.AddSingleton<IFileSystem, FileSystem>();
+                    services.AddSingleton<IFileWatcherWrapper, FileWatcherWrapper>();
+                    services.AddSingleton<IDelayService, DelayService>();                    
                     services.AddSingleton<IModeRunner, ModeRunnerService>();
                     services.AddSingleton<IAIApiService, AIApiService>();
                     services.AddSingleton<ICodeMonitor, CodeMonitor>();
                     services.AddTransient<ITestUpdater, TestUpdater>();
                     services.AddSingleton<ICodeAnalyzer, CodeAnalyzer>();
-                    services.AddSingleton<IGitIntegrationService, GitIntegrationService>();
+                    services.AddSingleton<IGitHubClientWrapper, GitHubClientWrapper>();
+                    services.AddSingleton<IGitProcessService, GitProcessService>();
+                    services.AddSingleton<IGitMonitorService, GitMonitorService>();
+                    services.AddSingleton<IConsoleService, ConsoleService>();
 
                     // Register the Application runner.
                     services.AddSingleton<AppStarter>();

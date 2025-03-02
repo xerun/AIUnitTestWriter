@@ -1,5 +1,6 @@
 ﻿using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services.Interfaces;
+using System.IO.Abstractions;
 
 namespace AIUnitTestWriter.Services
 {
@@ -8,6 +9,7 @@ namespace AIUnitTestWriter.Services
         private readonly IAIApiService _aiService;
         private readonly ICodeAnalyzer _codeAnalyzer;
         private readonly IConsoleService _consoleService;
+        private readonly IFileSystem _fileSystem;
 
         private const int SourceLineThreshold = 500;
         private const int TestLineThreshold = 500;
@@ -15,11 +17,13 @@ namespace AIUnitTestWriter.Services
         public TestUpdater(
             IAIApiService aiService,
             ICodeAnalyzer codeAnalyzer,
-            IConsoleService consoleService)
+            IConsoleService consoleService,
+            IFileSystem fileSystem)
         {
-            _aiService = aiService;
-            _codeAnalyzer = codeAnalyzer;
-            _consoleService = consoleService;
+            _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
+            _codeAnalyzer = codeAnalyzer ?? throw new ArgumentNullException(nameof(codeAnalyzer));
+            _consoleService = consoleService ?? throw new ArgumentNullException(nameof(consoleService));
+            _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         }
 
         /// <summary>
@@ -33,7 +37,7 @@ namespace AIUnitTestWriter.Services
             try
             {
                 // Read the source file.
-                var sourceCode = File.ReadAllText(filePath);
+                var sourceCode = _fileSystem.File.ReadAllText(filePath);
                 if (sourceCode.Contains("interface"))
                 {
                     _consoleService.WriteColored("Skipped interface file.", ConsoleColor.DarkGray);
@@ -42,7 +46,7 @@ namespace AIUnitTestWriter.Services
 
                 // Analyze the source file for public methods.
                 var publicMethods = _codeAnalyzer.GetPublicMethodNames(sourceCode);
-                if (publicMethods.Count == 0)
+                if (publicMethods?.Count == 0)
                 {
                     _consoleService.WriteColored("No public methods found; skipping test generation.", ConsoleColor.DarkGray);
                     return null;
@@ -70,13 +74,13 @@ namespace AIUnitTestWriter.Services
                 }
 
                 // Compute the test file path.
-                var relativePath = Path.GetRelativePath(srcFolder, filePath);
-                var testFilePath = Path.Combine(testsFolder, relativePath);
-                testFilePath = Path.Combine(Path.GetDirectoryName(testFilePath),
-                    Path.GetFileNameWithoutExtension(testFilePath) + "Tests" + Path.GetExtension(testFilePath));
+                var relativePath = _fileSystem.Path.GetRelativePath(srcFolder, filePath);
+                var testFilePath = _fileSystem.Path.Combine(testsFolder, relativePath);
+                testFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetDirectoryName(testFilePath),
+                    _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "Tests" + _fileSystem.Path.GetExtension(testFilePath));
 
                 // Read any existing tests.
-                var existingTests = File.Exists(testFilePath) ? File.ReadAllText(testFilePath) : string.Empty;
+                var existingTests = _fileSystem.File.Exists(testFilePath) ? _fileSystem.File.ReadAllText(testFilePath) : string.Empty;
 
                 // Build the prompt for the AI.
                 var prompt = GeneratePrompt(methodCodeToSend, existingTests, sampleUnitTest);
@@ -90,9 +94,9 @@ namespace AIUnitTestWriter.Services
                 }
 
                 // Write the generated tests to a temporary file.
-                var tempFileName = Path.GetFileNameWithoutExtension(testFilePath) + "_temp" + Path.GetExtension(testFilePath);
-                var tempFilePath = Path.Combine(Path.GetTempPath(), tempFileName);
-                File.WriteAllText(tempFilePath, aiResponse);
+                var tempFileName = _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "_temp" + _fileSystem.Path.GetExtension(testFilePath);
+                var tempFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), tempFileName);
+                _fileSystem.File.WriteAllText(tempFilePath, aiResponse);
                 _consoleService.WriteColored($"Generated test file saved to temporary file: {tempFilePath}", ConsoleColor.Green);
 
                 // Optionally, try to open the temporary file.
@@ -145,8 +149,8 @@ namespace AIUnitTestWriter.Services
         /// </summary>
         public void FinalizeTestUpdate(TestGenerationResultModel result)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(result.TestFilePath));
-            File.WriteAllText(result.TestFilePath, result.GeneratedTestCode);
+            _fileSystem.Directory.CreateDirectory(_fileSystem.Path.GetDirectoryName(result.TestFilePath));
+            _fileSystem.File.WriteAllText(result.TestFilePath, result.GeneratedTestCode);
         }
 
         private string GeneratePrompt(string methodCode, string existingTests, string sampleUnitTest)

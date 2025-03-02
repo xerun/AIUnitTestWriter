@@ -1,178 +1,200 @@
 ﻿using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Interfaces;
-using Microsoft.Extensions.Configuration;
+using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
     public class ProjectInitializerServiceTests
     {
-        private readonly Mock<IConfiguration> _mockConfiguration;
         private readonly Mock<IConsoleService> _mockConsoleService;
+        private readonly ProjectSettings _projectSettings;
+        private readonly GitSettings _gitSettings;
         private readonly ProjectInitializerService _projectInitializerService;
 
         public ProjectInitializerServiceTests()
         {
-            _mockConfiguration = new Mock<IConfiguration>();
             _mockConsoleService = new Mock<IConsoleService>();
 
-            _projectInitializerService = new ProjectInitializerService(
-                _mockConfiguration.Object,
-                _mockConsoleService.Object
-            );
+            _projectSettings = new ProjectSettings
+            {
+                SourceFolder = "src",
+                TestsFolder = "tests"
+            };
+
+            _gitSettings = new GitSettings
+            {
+                LocalRepositoryPath = Path.Combine(Path.GetTempPath(), "TestRepo")
+            };
+
+            var projectSettingsOptions = Options.Create(_projectSettings);
+            var gitSettingsOptions = Options.Create(_gitSettings);
+
+            _projectInitializerService = new ProjectInitializerService(projectSettingsOptions, gitSettingsOptions, _mockConsoleService.Object);
         }
 
         [Fact]
-        public void Initialize_ShouldSetLocalProjectPath_WhenValidLocalPathIsEntered()
+        public void Initialize_Should_SetupLocalProject_When_ValidLocalPathProvided()
         {
             // Arrange
-            string projectPath = "C:\\MyProject";
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
-                               .Returns(projectPath);
+            string localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
+            Directory.CreateDirectory(localProjectPath); // Ensure the directory exists
 
-            Directory.CreateDirectory(projectPath); // Simulate the directory existing
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns(localProjectPath);
 
-            _mockConfiguration.Setup(c => c["Project:SourceFolder"]).Returns("src");
-            _mockConfiguration.Setup(c => c["Project:TestsFolder"]).Returns("tests");
-
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
-                               .Returns("n"); // User does not provide a sample unit test file
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
+                               .Returns("n"); // No sample test file
 
             // Act
-            var result = _projectInitializerService.Initialize();
+            var config = _projectInitializerService.Initialize();
 
             // Assert
-            Assert.False(result.IsGitRepository);
-            Assert.Equal(projectPath, result.ProjectPath);
-            Assert.Equal(Path.Combine(projectPath, "src"), result.SrcFolder);
-            Assert.Equal(Path.Combine(projectPath, "tests"), result.TestsFolder);
-            Assert.Equal(string.Empty, result.SampleUnitTestContent);
+            Assert.Equal(localProjectPath, config.ProjectPath);
+            Assert.False(config.IsGitRepository);
+            Assert.Equal(Path.Combine(localProjectPath, _projectSettings.SourceFolder), config.SrcFolder);
+            Assert.Equal(Path.Combine(localProjectPath, _projectSettings.TestsFolder), config.TestsFolder);
+            Assert.Empty(config.SampleUnitTestContent);
         }
 
         [Fact]
-        public void Initialize_ShouldSetGitRepository_WhenValidGitUrlIsEntered()
+        public void Initialize_Should_SetupGitRepository_When_ValidGitUrlProvided()
         {
             // Arrange
-            string gitUrl = "https://github.com/example/repo.git";
-            string localPath = "C:\\GitClone";
+            string gitRepoUrl = "https://github.com/test/repo.git";
 
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
-                               .Returns(gitUrl) // First input: Git URL
-                               .Returns(localPath); // Second input: local path
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns(gitRepoUrl);
 
-            _mockConfiguration.Setup(c => c["Project:SourceFolder"]).Returns("src");
-            _mockConfiguration.Setup(c => c["Project:TestsFolder"]).Returns("tests");
-
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
-                               .Returns("n"); // User does not provide a sample unit test file
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
+                               .Returns("n"); // No sample test file
 
             // Act
-            var result = _projectInitializerService.Initialize();
+            var config = _projectInitializerService.Initialize();
 
             // Assert
-            Assert.True(result.IsGitRepository);
-            Assert.Equal(gitUrl, result.GitRepositoryUrl);
-            Assert.Equal(localPath, result.ProjectPath);
-            Assert.Equal(Path.Combine(localPath, "src"), result.SrcFolder);
-            Assert.Equal(Path.Combine(localPath, "tests"), result.TestsFolder);
-            Assert.Equal(string.Empty, result.SampleUnitTestContent);
+            Assert.True(config.IsGitRepository);
+            Assert.Equal(gitRepoUrl, config.GitRepositoryUrl);
+            Assert.Equal(_gitSettings.LocalRepositoryPath, config.ProjectPath);
+            Assert.Equal(Path.Combine(_gitSettings.LocalRepositoryPath, _projectSettings.SourceFolder), config.SrcFolder);
+            Assert.Equal(Path.Combine(_gitSettings.LocalRepositoryPath, _projectSettings.TestsFolder), config.TestsFolder);
+            Assert.Empty(config.SampleUnitTestContent);
         }
 
         [Fact]
-        public void Initialize_ShouldRePromptOnInvalidInput()
+        public void Initialize_Should_CreateGitRepositoryDirectory_If_NotExists()
         {
             // Arrange
-            string invalidInput = "invalidPath";
-            string validPath = "C:\\ValidProject";
+            string gitRepoUrl = "https://github.com/test/repo.git";
 
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
-                               .Returns(invalidInput) // First input: invalid path
-                               .Returns(validPath); // Second input: valid path
+            if (Directory.Exists(_gitSettings.LocalRepositoryPath))
+                Directory.Delete(_gitSettings.LocalRepositoryPath, true); // Ensure fresh test
 
-            _mockConsoleService.Setup(cs => cs.WriteColored("Invalid input. Please enter a valid local path or a Git repository URL.", ConsoleColor.Red));
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns(gitRepoUrl);
 
-            Directory.CreateDirectory(validPath); // Simulate valid directory existing
-
-            _mockConfiguration.Setup(c => c["Project:SourceFolder"]).Returns("src");
-            _mockConfiguration.Setup(c => c["Project:TestsFolder"]).Returns("tests");
-
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
-                               .Returns("n"); // User does not provide a sample unit test file
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
+                               .Returns("n"); // No sample test file
 
             // Act
-            var result = _projectInitializerService.Initialize();
+            var config = _projectInitializerService.Initialize();
 
             // Assert
-            Assert.False(result.IsGitRepository);
-            Assert.Equal(validPath, result.ProjectPath);
-            Assert.Equal(Path.Combine(validPath, "src"), result.SrcFolder);
-            Assert.Equal(Path.Combine(validPath, "tests"), result.TestsFolder);
-            _mockConsoleService.Verify(cs => cs.WriteColored("Invalid input. Please enter a valid local path or a Git repository URL.", ConsoleColor.Red), Times.Once);
+            Assert.True(Directory.Exists(_gitSettings.LocalRepositoryPath));
+            Assert.True(config.IsGitRepository);
         }
 
         [Fact]
-        public void Initialize_ShouldHandleSampleUnitTestFile()
+        public void Initialize_Should_Reprompt_On_InvalidInput()
         {
             // Arrange
-            string projectPath = "C:\\MyProject";
-            string sampleTestFile = "C:\\SampleTest.cs";
-            string sampleContent = "public class SampleTest {}";
+            _mockConsoleService.SetupSequence(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns("invalid-path") // Invalid input
+                               .Returns("https://github.com/test/repo.git"); // Valid Git URL
 
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
-                               .Returns(projectPath);
+            _mockConsoleService.Setup(m => m.WriteColored("Invalid input. Please enter a valid local path or a Git repository URL.", ConsoleColor.Red));
 
-            Directory.CreateDirectory(projectPath); // Simulate the directory existing
-            File.WriteAllText(sampleTestFile, sampleContent); // Create a temporary sample test file
-
-            _mockConfiguration.Setup(c => c["Project:SourceFolder"]).Returns("src");
-            _mockConfiguration.Setup(c => c["Project:TestsFolder"]).Returns("tests");
-
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
-                               .Returns("y"); // User wants to provide a sample unit test file
-
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
-                               .Returns(sampleTestFile); // User provides sample test file path
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
+                               .Returns("n"); // No sample test file
 
             // Act
-            var result = _projectInitializerService.Initialize();
+            var config = _projectInitializerService.Initialize();
 
             // Assert
-            Assert.Equal(sampleContent, result.SampleUnitTestContent);
+            _mockConsoleService.Verify(m => m.WriteColored("Invalid input. Please enter a valid local path or a Git repository URL.", ConsoleColor.Red), Times.Once);
+            Assert.True(config.IsGitRepository);
         }
 
         [Fact]
-        public void Initialize_ShouldHandleInvalidSampleUnitTestFilePath()
+        public void Initialize_Should_Set_SampleUnitTestContent_When_ValidFileProvided()
         {
             // Arrange
-            string projectPath = "C:\\MyProject";
-            string invalidFilePath = "C:\\InvalidTest.cs";
-            string validFilePath = "C:\\ValidTest.cs";
-            string validFileContent = "public class ValidTest {}";
+            string localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
+            Directory.CreateDirectory(localProjectPath);
 
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
-                               .Returns(projectPath);
+            string sampleTestFilePath = Path.Combine(Path.GetTempPath(), "SampleTest.cs");
+            File.WriteAllText(sampleTestFilePath, "Sample Unit Test Content");
 
-            Directory.CreateDirectory(projectPath); // Simulate the directory existing
-            File.WriteAllText(validFilePath, validFileContent); // Create a valid sample test file
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns(localProjectPath);
 
-            _mockConfiguration.Setup(c => c["Project:SourceFolder"]).Returns("src");
-            _mockConfiguration.Setup(c => c["Project:TestsFolder"]).Returns("tests");
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
+                               .Returns("y"); // Wants to provide a sample file
 
-            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
-                               .Returns("y"); // User wants to provide a sample unit test file
-
-            _mockConsoleService.SetupSequence(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
-                               .Returns(invalidFilePath) // First attempt: invalid file path
-                               .Returns(validFilePath); // Second attempt: valid file path
-
-            _mockConsoleService.Setup(cs => cs.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red));
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
+                               .Returns(sampleTestFilePath);
 
             // Act
-            var result = _projectInitializerService.Initialize();
+            var config = _projectInitializerService.Initialize();
 
             // Assert
-            Assert.Equal(validFileContent, result.SampleUnitTestContent);
-            _mockConsoleService.Verify(cs => cs.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red), Times.Once);
+            Assert.Equal("Sample Unit Test Content", config.SampleUnitTestContent);
+        }
+
+        [Fact]
+        public void Initialize_Should_Reprompt_When_InvalidSampleFilePathProvided()
+        {
+            // Arrange
+            string localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
+            Directory.CreateDirectory(localProjectPath);
+
+            string invalidSampleTestFilePath = Path.Combine(Path.GetTempPath(), "InvalidSampleTest.cs");
+
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns(localProjectPath);
+
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.DarkYellow))
+                               .Returns("y"); // Wants to provide a sample file
+
+            _mockConsoleService.SetupSequence(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow))
+                               .Returns(invalidSampleTestFilePath) // Invalid path
+                               .Returns(invalidSampleTestFilePath) // Invalid again
+                               .Returns("valid-test.cs"); // Finally valid (but not used in test)
+
+            _mockConsoleService.Setup(m => m.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red));
+
+            // Act
+            var config = _projectInitializerService.Initialize();
+
+            // Assert
+            _mockConsoleService.Verify(m => m.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red), Times.Exactly(3));
+        }
+
+        [Fact]
+        public void Initialize_Should_ThrowException_When_MissingProjectSettings()
+        {
+            // Arrange
+            var invalidSettings = new ProjectSettings();
+            var invalidProjectSettingsOptions = Options.Create(invalidSettings);
+            var service = new ProjectInitializerService(invalidProjectSettingsOptions, Options.Create(_gitSettings), _mockConsoleService.Object);
+
+            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
+                               .Returns("https://github.com/test/repo.git");
+
+            // Act & Assert
+            var ex = Assert.Throws<ArgumentException>(() => service.Initialize());
+            Assert.Equal(nameof(invalidSettings.SourceFolder), ex.Message);
         }
     }
 }

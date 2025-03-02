@@ -1,6 +1,6 @@
 ﻿using AIUnitTestWriter.Services;
-using AIUnitTestWriter.Services.Interfaces;
-using Microsoft.Extensions.Configuration;
+using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Moq.Protected;
 using System.Net;
@@ -11,168 +11,182 @@ namespace AIUnitTestWriter.UnitTests.Services
 {
     public class AIApiServiceTests
     {
-        private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
-        private readonly IConfiguration _configuration;
-        private IAIApiService _aiApiService;
+        private readonly Mock<IHttpClientFactory> _mockHttpClientFactory;
         private readonly HttpClient _httpClient;
+        private readonly Mock<HttpMessageHandler> _mockHttpMessageHandler;
+        private readonly IOptions<AISettings> _mockAISettings;
 
         public AIApiServiceTests()
         {
-            // Mock Configuration Settings
-            var configData = new Dictionary<string, string>
-        {
-            { "AI:ApiKey", "test-api-key" },
-            { "AI:Provider", "OpenAI" },
-            { "AI:Endpoint", "https://fake-api.com" },
-            { "AI:Model", "gpt-4" },
-            { "AI:MaxTokens", "1000" },
-            { "AI:Temperature", "0.7" }
-        };
+            _mockHttpClientFactory = new Mock<IHttpClientFactory>();
+            _mockHttpMessageHandler = new Mock<HttpMessageHandler>();
 
-            _configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(configData)
-                .Build();
+            _httpClient = new HttpClient(_mockHttpMessageHandler.Object);
+            _mockHttpClientFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(_httpClient);
 
-            // Mock HttpMessageHandler
-            _httpMessageHandlerMock = new Mock<HttpMessageHandler>();
-
-            // Create HttpClient with mocked handler
-            _httpClient = new HttpClient(_httpMessageHandlerMock.Object);
-
-            // Inject HttpClient into AIApiService
-            _aiApiService = new AIApiService(_configuration, _httpClient);
+            _mockAISettings = Options.Create(new AISettings
+            {
+                ApiKey = "test-key",
+                Provider = "OpenAI",
+                Endpoint = "https://api.openai.com/v1/completions",
+                Model = "gpt-4",
+                MaxTokens = 100,
+                Temperature = 0.7
+            });
         }
 
         [Fact]
-        public async Task GenerateTestsAsync_OpenAI_ReturnsGeneratedCode()
+        public void Constructor_ShouldThrowArgumentNullException_WhenHttpClientFactoryIsNull()
+        {
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(_mockAISettings, null));
+        }
+
+        [Fact]
+        public void Constructor_ShouldThrowArgumentNullException_WhenAISettingsAreInvalid()
+        {
+            var invalidSettings = Options.Create(new AISettings { ApiKey = null });
+
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(invalidSettings, _mockHttpClientFactory.Object));
+        }
+
+        [Fact]
+        public async Task GenerateTestsAsync_ShouldCallGenerateTestsOpenAI_WhenProviderIsOpenAI()
         {
             // Arrange
-            var expectedResponse = @"{
-            ""choices"": [{ ""text"": ""public class MyTest { }"" }]
-        }";
+            var aiService = new AIApiService(_mockAISettings, _mockHttpClientFactory.Object);
 
-            MockHttpResponse(HttpStatusCode.OK, expectedResponse);
+            var mockResponse = new
+            {
+                choices = new[]
+                {
+                new { text = "Generated OpenAI test" }
+            }
+            };
+
+            var jsonResponse = JsonSerializer.Serialize(mockResponse);
+            SetupHttpResponse(jsonResponse, HttpStatusCode.OK);
 
             // Act
-            var result = await _aiApiService.GenerateTestsAsync("Generate test code");
+            var result = await aiService.GenerateTestsAsync("Test prompt");
 
             // Assert
-            Assert.Equal("public class MyTest { }", result);
+            Assert.Equal("Generated OpenAI test", result);
         }
 
         [Fact]
-        public async Task GenerateTestsAsync_Ollama_ReturnsGeneratedCode()
+        public async Task GenerateTestsAsync_ShouldCallGenerateTestsOllama_WhenProviderIsOllama()
         {
             // Arrange
-            SetProvider("Ollama");
-            var expectedResponse = @"{ ""response"": ""```public class MyTest { }```"" }";
+            var ollamaSettings = Options.Create(new AISettings
+            {
+                ApiKey = "test-key",
+                Provider = "Ollama",
+                Endpoint = "http://localhost:11434/api/generate",
+                Model = "ollama-model",
+                MaxTokens = 100,
+                Temperature = 0.7
+            });
 
-            MockHttpResponse(HttpStatusCode.OK, expectedResponse);
+            var aiService = new AIApiService(ollamaSettings, _mockHttpClientFactory.Object);
+
+            var mockResponse = new { response = "Generated Ollama test" };
+            var jsonResponse = JsonSerializer.Serialize(mockResponse);
+            SetupHttpResponse(jsonResponse, HttpStatusCode.OK);
 
             // Act
-            var result = await _aiApiService.GenerateTestsAsync("Generate test code");
+            var result = await aiService.GenerateTestsAsync("Test prompt");
 
             // Assert
-            Assert.Equal("public class MyTest { }", result);
+            Assert.Equal("Generated Ollama test", result);
         }
 
         [Fact]
-        public async Task GenerateTestsAsync_WhenApiFails_ReturnsEmptyString()
+        public async Task GenerateTestsAsync_ShouldReturnEmptyString_WhenHttpResponseIsNotSuccessful()
         {
             // Arrange
-            MockHttpResponse(HttpStatusCode.BadRequest, "{}");
+            var aiService = new AIApiService(_mockAISettings, _mockHttpClientFactory.Object);
+
+            SetupHttpResponse("{}", HttpStatusCode.BadRequest);
 
             // Act
-            var result = await _aiApiService.GenerateTestsAsync("Generate test code");
+            var result = await aiService.GenerateTestsAsync("Test prompt");
 
             // Assert
             Assert.Equal(string.Empty, result);
         }
 
         [Fact]
-        public async Task GenerateTestsAsync_OpenAI_HandlesMalformedJsonGracefully()
+        public async Task GenerateTestsOllama_ShouldRemoveThinkTags_AndExtractCSharpCode()
         {
             // Arrange
-            var invalidJson = "{ \"choices\": [{ \"text\": ";
+            var ollamaSettings = Options.Create(new AISettings
+            {
+                ApiKey = "test-key",
+                Provider = "Ollama",
+                Endpoint = "http://localhost:11434/api/generate",
+                Model = "ollama-model",
+                MaxTokens = 100,
+                Temperature = 0.7
+            });
 
-            MockHttpResponse(HttpStatusCode.OK, invalidJson);
+            var aiService = new AIApiService(ollamaSettings, _mockHttpClientFactory.Object);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<JsonException>(() => _aiApiService.GenerateTestsAsync("Generate test code"));
-        }
+            var mockResponse = new
+            {
+                response = "<think>Some thoughts...</think> ```csharp\npublic class Test { }\n```"
+            };
 
-        [Fact]
-        public async Task GenerateTestsAsync_Ollama_HandlesThinkTagsAndCodeExtraction()
-        {
-            // Arrange
-            SetProvider("Ollama");
-            var responseWithThinkTags = @"{
-            ""response"": ""<think>Ignore this</think> ```public class MyTest { }```""
-        }";
-
-            MockHttpResponse(HttpStatusCode.OK, responseWithThinkTags);
+            var jsonResponse = JsonSerializer.Serialize(mockResponse);
+            SetupHttpResponse(jsonResponse, HttpStatusCode.OK);
 
             // Act
-            var result = await _aiApiService.GenerateTestsAsync("Generate test code");
+            var result = await aiService.GenerateTestsAsync("Test prompt");
 
             // Assert
-            Assert.Equal("public class MyTest { }", result);
+            Assert.Equal("public class Test { }", result);
         }
 
         [Fact]
-        public void Constructor_ThrowsException_WhenConfigMissing()
+        public async Task GenerateTestsOllama_ShouldReturnFullResponse_IfNoCodeBlockExists()
         {
             // Arrange
-            var configData = new Dictionary<string, string>
-        {
-            { "AI:Provider", "OpenAI" } // Missing required keys
-        };
+            var ollamaSettings = Options.Create(new AISettings
+            {
+                ApiKey = "test-key",
+                Provider = "Ollama",
+                Endpoint = "http://localhost:11434/api/generate",
+                Model = "ollama-model",
+                MaxTokens = 100,
+                Temperature = 0.7
+            });
 
-            var faultyConfig = new ConfigurationBuilder()
-                .AddInMemoryCollection(configData)
-                .Build();
+            var aiService = new AIApiService(ollamaSettings, _mockHttpClientFactory.Object);
 
-            // Act & Assert
-            var exception = Assert.Throws<ArgumentNullException>(() => new AIApiService(faultyConfig, _httpClient));
-            Assert.Contains("not configured", exception.Message);
+            var mockResponse = new { response = "Regular text response" };
+            var jsonResponse = JsonSerializer.Serialize(mockResponse);
+            SetupHttpResponse(jsonResponse, HttpStatusCode.OK);
+
+            // Act
+            var result = await aiService.GenerateTestsAsync("Test prompt");
+
+            // Assert
+            Assert.Equal("Regular text response", result);
         }
 
-        /// <summary>
-        /// Helper method to mock an HTTP response
-        /// </summary>
-        private void MockHttpResponse(HttpStatusCode statusCode, string responseContent)
+        private void SetupHttpResponse(string responseBody, HttpStatusCode statusCode)
         {
-            _httpMessageHandlerMock
+            _mockHttpMessageHandler
                 .Protected()
-                .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+                .Setup<Task<HttpResponseMessage>>(
+                    "SendAsync",
+                    ItExpr.IsAny<HttpRequestMessage>(),
+                    ItExpr.IsAny<CancellationToken>()
+                )
                 .ReturnsAsync(new HttpResponseMessage
                 {
                     StatusCode = statusCode,
-                    Content = new StringContent(responseContent, Encoding.UTF8, "application/json")
+                    Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
                 });
-        }
-
-        /// <summary>
-        /// Helper method to update AI provider in configuration
-        /// </summary>
-        private void SetProvider(string provider)
-        {
-            var newConfigData = new Dictionary<string, string>
-        {
-            { "AI:ApiKey", "test-api-key" },
-            { "AI:Provider", provider },
-            { "AI:Endpoint", "https://fake-api.com" },
-            { "AI:Model", "gpt-4" },
-            { "AI:MaxTokens", "1000" },
-            { "AI:Temperature", "0.7" }
-        };
-
-            var updatedConfig = new ConfigurationBuilder()
-                .AddInMemoryCollection(newConfigData)
-                .Build();
-
-            // Reinitialize the service with updated config
-            _aiApiService = new AIApiService(updatedConfig, _httpClient);
         }
     }
 }

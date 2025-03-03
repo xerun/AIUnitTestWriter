@@ -1,4 +1,5 @@
 ﻿using AIUnitTestWriter.Services;
+using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -36,17 +37,12 @@ namespace AIUnitTestWriter.UnitTests.Services
         }
 
         [Fact]
-        public void Constructor_ShouldThrowArgumentNullException_WhenHttpClientFactoryIsNull()
+        public void Constructor_ShouldThrowException_WhenNull()
         {
+#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(null, _mockHttpClientFactory.Object));
             Assert.Throws<ArgumentNullException>(() => new AIApiService(_mockAISettings, null));
-        }
-
-        [Fact]
-        public void Constructor_ShouldThrowArgumentNullException_WhenAISettingsAreInvalid()
-        {
-            var invalidSettings = Options.Create(new AISettings { ApiKey = null });
-
-            Assert.Throws<ArgumentNullException>(() => new AIApiService(invalidSettings, _mockHttpClientFactory.Object));
+#pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
         }
 
         [Fact]

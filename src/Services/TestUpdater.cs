@@ -11,8 +11,8 @@ namespace AIUnitTestWriter.Services
         private readonly IConsoleService _consoleService;
         private readonly IFileSystem _fileSystem;
 
-        private const int SourceLineThreshold = 500;
-        private const int TestLineThreshold = 500;
+        private const int SourceLineThreshold = 300;
+        private const int TestLineThreshold = 300;
 
         public TestUpdater(
             IAIApiService aiService,

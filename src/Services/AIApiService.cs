@@ -77,15 +77,13 @@ namespace AIUnitTestWriter.Services
             var jsonResponse = await response.Content.ReadAsStringAsync();
 
             // Parse the JSON response assuming the API returns a choices array.
-            using (var doc = JsonDocument.Parse(jsonResponse))
+            var doc = JsonDocument.Parse(jsonResponse);            
+            var root = doc.RootElement;
+            var choices = root.GetProperty("choices");
+            if (choices.GetArrayLength() > 0)
             {
-                var root = doc.RootElement;
-                var choices = root.GetProperty("choices");
-                if (choices.GetArrayLength() > 0)
-                {
-                    var generatedText = choices[0].GetProperty("text").GetString();
-                    return generatedText.Trim();
-                }
+                var generatedText = choices[0].GetProperty("text").GetString();
+                return generatedText.Trim();
             }
             return string.Empty;
         }
@@ -118,10 +116,10 @@ namespace AIUnitTestWriter.Services
             var jsonResponse = await response.Content.ReadAsStringAsync();
             var generatedText = string.Empty;
 
-            using JsonDocument doc = JsonDocument.Parse(jsonResponse);
-            generatedText = doc.RootElement.GetProperty("response").GetString();
+            var doc = JsonDocument.Parse(jsonResponse);            
+            generatedText = doc.RootElement.GetProperty("response").GetString();            
 
-            // Remove everything inside <think>...</think> tags if present.
+            // Remove everything inside <think>...</think> tags if present for reasoning models..
             if (!string.IsNullOrWhiteSpace(generatedText))
             {
                 generatedText = Regex.Replace(generatedText, "<think>.*?</think>", string.Empty, RegexOptions.Singleline).Trim();

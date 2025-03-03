@@ -56,7 +56,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         }
 
         [Fact]
-        public void Constructor_ShouldThrowException_WhenGitSettingsIsNull()
+        public void Constructor_ShouldThrowException_WhenNull()
         {
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
             Assert.Throws<ArgumentNullException>(() => new GitMonitorService(null, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object));

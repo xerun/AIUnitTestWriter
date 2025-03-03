@@ -32,6 +32,13 @@ namespace AIUnitTestWriter.Services
         {
             try
             {
+                // Check if the file is in the predefined skip list
+                if (SkippedFilesManager.ShouldSkip(filePath))
+                {
+                    _consoleService.WriteColored($"Skipped file (in predefined list): {filePath}", ConsoleColor.DarkGray);
+                    return null;
+                }
+
                 // Read the source file.
                 var sourceCode = File.ReadAllText(filePath);
                 if (sourceCode.Contains("interface"))

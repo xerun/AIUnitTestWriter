@@ -135,9 +135,11 @@ namespace AIUnitTestWriter.Services.Git
             }
 
             var files = output.Split('\n')
-                              .Select(line => line.Trim())
-                              .Where(line => !string.IsNullOrWhiteSpace(line) && line.Contains(".cs"))
-                              .ToList();
+                      .Select(line => line.Trim())
+                      .Where(line => !string.IsNullOrWhiteSpace(line) &&
+                                     line.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+                                     !SkippedFilesManager.ShouldSkip(line)) // Combined conditions
+                      .ToList();
 
             _consoleService.WriteColored($"Pulled changes detected: {string.Join(", ", files)}", ConsoleColor.Cyan);
 

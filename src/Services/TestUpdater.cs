@@ -11,8 +11,8 @@ namespace AIUnitTestWriter.Services
         private readonly IConsoleService _consoleService;
         private readonly IFileSystem _fileSystem;
 
-        private const int SourceLineThreshold = 500;
-        private const int TestLineThreshold = 500;
+        private const int SourceLineThreshold = 300;
+        private const int TestLineThreshold = 300;
 
         public TestUpdater(
             IAIApiService aiService,
@@ -36,6 +36,13 @@ namespace AIUnitTestWriter.Services
         {
             try
             {
+                // Check if the file is in the predefined skip list
+                if (SkippedFilesManager.ShouldSkip(filePath))
+                {
+                    _consoleService.WriteColored($"Skipped file (in predefined list): {filePath}", ConsoleColor.DarkGray);
+                    return null;
+                }
+
                 // Read the source file.
                 var sourceCode = _fileSystem.File.ReadAllText(filePath);
                 if (sourceCode.Contains("interface"))

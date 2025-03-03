@@ -8,7 +8,7 @@ using Octokit;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
-    public class GitIntegrationServiceTests
+    public class GitMonitorServiceTests
     {
         private readonly Mock<IGitProcessService> _gitProcessServiceMock;
         private readonly Mock<ITestUpdater> _testUpdaterMock;
@@ -19,7 +19,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly ProjectConfigModel _projectConfig;
         private readonly GitMonitorService _gitService;
 
-        public GitIntegrationServiceTests()
+        public GitMonitorServiceTests()
         {
             _gitProcessServiceMock = new Mock<IGitProcessService>();
             _testUpdaterMock = new Mock<ITestUpdater>();

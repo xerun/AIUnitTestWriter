@@ -18,5 +18,8 @@ namespace AIUnitTestWriter.Services
             WriteColored(message, color);
             return Console.ReadLine()?.Trim();
         }
+
+        /// <inheritdoc/>
+        public string ReadLine() => Console.ReadLine();
     }
 }

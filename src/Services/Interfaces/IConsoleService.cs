@@ -16,5 +16,11 @@
         /// <param name="color"></param>
         /// <returns></returns>
         string Prompt(string message, ConsoleColor color);
+
+        /// <summary>
+        /// Reads a line of characters from the console.
+        /// </summary>
+        /// <returns></returns>
+        string ReadLine();
     }
 }

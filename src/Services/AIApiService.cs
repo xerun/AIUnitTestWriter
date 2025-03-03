@@ -1,5 +1,6 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
-using Microsoft.Extensions.Configuration;
+﻿using AIUnitTestWriter.SettingOptions;
+using AIUnitTestWriter.Services.Interfaces;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -7,9 +8,10 @@ using System.Text.RegularExpressions;
 
 namespace AIUnitTestWriter.Services
 {
-    public class AIApiService: IAIApiService
+    public class AIApiService : IAIApiService
     {
         private readonly HttpClient _httpClient;
+        private readonly AISettings _aiSettings;
         private readonly string _apiKey;
         private readonly string _endpoint;
         private readonly string _model;
@@ -17,16 +19,18 @@ namespace AIUnitTestWriter.Services
         private readonly double _temperature;
         private readonly string _provider;
 
-        public AIApiService(IConfiguration configuration, HttpClient httpClient)
+        public AIApiService(IOptions<AISettings> aiSettings, IHttpClientFactory httpClientFactory)
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            if (httpClientFactory == null) throw new ArgumentNullException(nameof(httpClientFactory));
+            _httpClient = httpClientFactory.CreateClient();
+            _aiSettings = aiSettings.Value;
 
-            _apiKey = configuration["AI:ApiKey"] ?? throw new ArgumentNullException("AI:ApiKey not configured");
-            _provider = configuration["AI:Provider"] ?? throw new ArgumentNullException("AI:Provider not configured");
-            _endpoint = configuration["AI:Endpoint"] ?? throw new ArgumentNullException("AI:Endpoint not configured");
-            _model = configuration["AI:Model"] ?? throw new ArgumentNullException("AI:Model not configured");
-            _maxTokens = int.TryParse(configuration["AI:MaxTokens"], out int tokens) ? tokens : 1500;
-            _temperature = double.TryParse(configuration["AI:Temperature"], out double temp) ? temp : 0.2;
+            _apiKey = _aiSettings.ApiKey ?? throw new ArgumentNullException(nameof(_aiSettings.ApiKey));
+            _provider = _aiSettings.Provider ?? throw new ArgumentNullException(nameof(_aiSettings.Provider));
+            _endpoint = _aiSettings.Endpoint ?? throw new ArgumentNullException(nameof(_aiSettings.Endpoint));
+            _model = _aiSettings.Model ?? throw new ArgumentNullException(nameof(_aiSettings.Model));
+            _maxTokens = _aiSettings.MaxTokens;
+            _temperature = _aiSettings.Temperature;
         }
 
         public async Task<string> GenerateTestsAsync(string prompt)
@@ -118,13 +122,13 @@ namespace AIUnitTestWriter.Services
             generatedText = doc.RootElement.GetProperty("response").GetString();
 
             // Remove everything inside <think>...</think> tags if present.
-            if (!string.IsNullOrEmpty(generatedText))
+            if (!string.IsNullOrWhiteSpace(generatedText))
             {
                 generatedText = Regex.Replace(generatedText, "<think>.*?</think>", string.Empty, RegexOptions.Singleline).Trim();
             }
 
             // Extract code between triple backticks if available.
-            var codeBlockMatch = Regex.Match(generatedText, "```(.*?)```", RegexOptions.Singleline);
+            var codeBlockMatch = Regex.Match(generatedText, @"```csharp\s*(.*?)```", RegexOptions.Singleline);
             if (codeBlockMatch.Success)
             {
                 generatedText = codeBlockMatch.Groups[1].Value.Trim();

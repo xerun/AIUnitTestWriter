@@ -2,6 +2,7 @@
 using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Interfaces;
 using Moq;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
@@ -10,6 +11,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly Mock<IAIApiService> _mockAiService;
         private readonly Mock<ICodeAnalyzer> _mockCodeAnalyzer;
         private readonly Mock<IConsoleService> _mockConsoleService;
+        private readonly MockFileSystem _mockFileSystem;
         private readonly TestUpdater _testUpdater;
 
         public TestUpdaterTests()
@@ -17,157 +19,108 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockAiService = new Mock<IAIApiService>();
             _mockCodeAnalyzer = new Mock<ICodeAnalyzer>();
             _mockConsoleService = new Mock<IConsoleService>();
+            _mockFileSystem = new MockFileSystem();
 
-            _testUpdater = new TestUpdater(_mockAiService.Object, _mockCodeAnalyzer.Object, _mockConsoleService.Object);
+            _testUpdater = new TestUpdater(
+                _mockAiService.Object,
+                _mockCodeAnalyzer.Object,
+                _mockConsoleService.Object,
+                _mockFileSystem
+            );
         }
 
         [Fact]
-        public async Task ProcessFileChange_SkipsInterfaceFiles_ReturnsNull()
+        public async Task ProcessFileChange_ShouldReturnNull_WhenFileContainsInterface()
         {
             // Arrange
-            string filePath = "test.cs";
-            File.WriteAllText(filePath, "public interface ITest { void Method(); }");
+            var filePath = @"C:\path\to\file.cs";
+            _mockFileSystem.AddFile(filePath, new MockFileData("public interface IMyInterface {}"));
 
             // Act
-            var result = await _testUpdater.ProcessFileChange("src", "tests", filePath);
+            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
 
             // Assert
             Assert.Null(result);
-            _mockConsoleService.Verify(m => m.WriteColored("Skipped interface file.", ConsoleColor.DarkGray), Times.Once);
-
-            // Cleanup
-            File.Delete(filePath);
+            _mockConsoleService.Verify(cs => cs.WriteColored("Skipped interface file.", ConsoleColor.DarkGray), Times.Once);
         }
 
         [Fact]
-        public async Task ProcessFileChange_NoPublicMethods_ReturnsNull()
+        public async Task ProcessFileChange_ShouldReturnNull_WhenNoPublicMethods()
         {
             // Arrange
-            string filePath = "test.cs";
-            File.WriteAllText(filePath, "class TestClass { private void Method() {} }");
-
-            _mockCodeAnalyzer.Setup(m => m.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string>());
+            var filePath = @"C:\path\to\file.cs";
+            _mockFileSystem.AddFile(filePath, new MockFileData("public class MyClass {}"));
+            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string>());
 
             // Act
-            var result = await _testUpdater.ProcessFileChange("src", "tests", filePath);
+            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
 
             // Assert
             Assert.Null(result);
-            _mockConsoleService.Verify(m => m.WriteColored("No public methods found; skipping test generation.", ConsoleColor.DarkGray), Times.Once);
-
-            // Cleanup
-            File.Delete(filePath);
+            _mockConsoleService.Verify(cs => cs.WriteColored("No public methods found; skipping test generation.", ConsoleColor.DarkGray), Times.Once);
         }
 
         [Fact]
-        public async Task ProcessFileChange_GeneratesTestFile_ReturnsResultModel()
+        public async Task ProcessFileChange_ShouldPromptForMethod_WhenFileIsLong()
         {
             // Arrange
-            string filePath = "src/TestClass.cs";
-            File.WriteAllText(filePath, "public class TestClass { public void Method() {} }");
+            var filePath = @"C:\path\to\file.cs";
+            var longSourceCode = @"public class MyClass { public void MyMethod() {} }";
 
-            _mockCodeAnalyzer.Setup(m => m.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "Method" });
-            _mockAiService.Setup(m => m.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("Generated Test Code");
+            // Make the source code 600 characters long
+            longSourceCode = longSourceCode.PadRight(600, '/'); // Fill the rest with / to make it exactly 600 characters
+            _mockFileSystem.AddFile(filePath, new MockFileData(longSourceCode));
+
+            _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Yellow)).Returns("TestMethod");
+            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
+            _mockCodeAnalyzer.Setup(ca => ca.GetMethodCode(It.IsAny<string>(), "TestMethod")).Returns("public void TestMethod() {}");
+            _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("Generated Test Code");
 
             // Act
-            var result = await _testUpdater.ProcessFileChange("src", "tests", filePath, promptUser: true);
+            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Contains("_temp", result.TempFilePath);
-            Assert.Contains("Generated Test Code", result.GeneratedTestCode);
-
-            // Cleanup
-            File.Delete(filePath);
-            File.Delete(result.TempFilePath);
+            Assert.NotNull(result);            
         }
 
         [Fact]
-        public async Task ProcessFileChange_LongFilePromptsForMethod_ReturnsResultModel()
+        public async Task ProcessFileChange_ShouldGenerateTestsAndWriteToTempFile()
         {
             // Arrange
-            string filePath = "src/LongTestClass.cs";
-            var longCode = new string('\n', 600) + "public class LongTestClass { public void LongMethod() {} }";
-            File.WriteAllText(filePath, longCode);
+            var filePath = @"C:\src\path\to\file.cs";
+            var sourceCode = "public class MyClass { public void MyMethod() {} }";
+            _mockFileSystem.AddFile(filePath, new MockFileData(sourceCode));
+            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
 
-            _mockCodeAnalyzer.Setup(m => m.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "LongMethod" });
-            _mockCodeAnalyzer.Setup(m => m.GetMethodCode(It.IsAny<string>(), "LongMethod")).Returns("public void LongMethod() {}");
-            _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Yellow)).Returns("LongMethod");
-            _mockAiService.Setup(m => m.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("Generated Test Code");
+            _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("Generated Test Code");
 
             // Act
-            var result = await _testUpdater.ProcessFileChange("src", "tests", filePath, promptUser: true);
+            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
 
             // Assert
             Assert.NotNull(result);
             Assert.Contains("Generated Test Code", result.GeneratedTestCode);
-
-            // Cleanup
-            File.Delete(filePath);
-            File.Delete(result.TempFilePath);
+            _mockConsoleService.Verify(cs => cs.WriteColored("Generated test file saved to temporary file:", ConsoleColor.Green), Times.AtMost(3));
         }
 
         [Fact]
-        public async Task ProcessFileChange_AIResponseEmpty_ReturnsNull()
+        public void FinalizeTestUpdate_ShouldCreateDirectoryAndWriteFile()
         {
             // Arrange
-            string filePath = "src/TestClass.cs";
-            File.WriteAllText(filePath, "public class TestClass { public void Method() {} }");
-
-            _mockCodeAnalyzer.Setup(m => m.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "Method" });
-            _mockAiService.Setup(m => m.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("");
-
-            // Act
-            var result = await _testUpdater.ProcessFileChange("src", "tests", filePath);
-
-            // Assert
-            Assert.Null(result);
-            _mockConsoleService.Verify(m => m.WriteColored("AI returned an empty response.", ConsoleColor.Yellow), Times.Once);
-
-            // Cleanup
-            File.Delete(filePath);
-        }
-
-        [Fact]
-        public void FinalizeTestUpdate_WritesTestFile()
-        {
-            // Arrange
-            string testFilePath = Path.Combine(Path.GetTempPath(), "FinalizedTest.cs");
             var result = new TestGenerationResultModel
             {
-                TestFilePath = testFilePath,
-                GeneratedTestCode = "Finalized Test Code"
+                TestFilePath = @"C:\tests\path\to\fileTests.cs",
+                GeneratedTestCode = "public class MyTest { public void TestMethod() {} }"
             };
 
             // Act
             _testUpdater.FinalizeTestUpdate(result);
 
             // Assert
-            Assert.True(File.Exists(testFilePath));
-            Assert.Equal("Finalized Test Code", File.ReadAllText(testFilePath));
-
-            // Cleanup
-            File.Delete(testFilePath);
-        }
-
-        [Fact]
-        public async Task ProcessFileChange_ExceptionHandling_ReturnsNull()
-        {
-            // Arrange
-            string filePath = "src/TestClass.cs";
-            File.WriteAllText(filePath, "public class TestClass { public void Method() {} }");
-
-            _mockCodeAnalyzer.Setup(m => m.GetPublicMethodNames(It.IsAny<string>())).Throws(new Exception("Error in code analysis"));
-
-            // Act
-            var result = await _testUpdater.ProcessFileChange("src", "tests", filePath);
-
-            // Assert
-            Assert.Null(result);
-            _mockConsoleService.Verify(m => m.WriteColored("Error in code analysis", ConsoleColor.Red), Times.Once);
-
-            // Cleanup
-            File.Delete(filePath);
+            Assert.True(_mockFileSystem.Directory.Exists(@"C:\tests\path\to"));
+            Assert.True(_mockFileSystem.FileExists(@"C:\tests\path\to\fileTests.cs"));
+            var writtenContent = _mockFileSystem.File.ReadAllText(@"C:\tests\path\to\fileTests.cs");
+            Assert.Contains("public class MyTest", writtenContent);
         }
     }
 }

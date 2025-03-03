@@ -8,6 +8,6 @@
         /// <param name="command"></param>
         /// <param name="workingDirectory"></param>
         /// <returns></returns>
-        string RunCommand(string command, string workingDirectory);
+        string? RunCommand(string command, string workingDirectory);
     }
 }

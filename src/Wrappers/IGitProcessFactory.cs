@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 
-namespace AIUnitTestWriter.Services.Interfaces
+namespace AIUnitTestWriter.Wrappers
 {
     public interface IGitProcessFactory
     {

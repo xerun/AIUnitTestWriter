@@ -2,7 +2,7 @@
 
 namespace AIUnitTestWriter.Services.Interfaces
 {
-    public interface ITestUpdater
+    public interface ITestUpdaterService
     {
         /// <summary>
         /// Processes the changed file and returns a TestGenerationResultModel in manual mode.

@@ -2,10 +2,10 @@
 using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.Services.Interfaces;
 using AIUnitTestWriter.SettingOptions;
+using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Octokit;
 using System.IO.Abstractions;
 
 namespace AIUnitTestWriter
@@ -41,15 +41,16 @@ namespace AIUnitTestWriter
                     {
                         var initializer = provider.GetRequiredService<IProjectInitializer>();
                         return initializer.Initialize();
-                    });                    
+                    });
+                    services.AddSingleton<IHttpRequestMessageFactory, HttpRequestMessageFactory>();
                     services.AddSingleton<IGitProcessFactory, GitProcessFactory>();
                     services.AddSingleton<IFileSystem, FileSystem>();
                     services.AddSingleton<IFileWatcherWrapper, FileWatcherWrapper>();
-                    services.AddSingleton<IDelayService, DelayService>();                    
+                    services.AddSingleton<IDelayService, DelayService>();
                     services.AddSingleton<IModeRunner, ModeRunnerService>();
                     services.AddSingleton<IAIApiService, AIApiService>();
                     services.AddSingleton<ICodeMonitor, CodeMonitor>();
-                    services.AddTransient<ITestUpdater, TestUpdater>();
+                    services.AddTransient<ITestUpdaterService, TestUpdaterService>();
                     services.AddSingleton<ICodeAnalyzer, CodeAnalyzer>();
                     services.AddSingleton<IGitHubClientWrapper, GitHubClientWrapper>();
                     services.AddSingleton<IGitProcessService, GitProcessService>();

@@ -5,12 +5,12 @@ namespace AIUnitTestWriter.Services
 {
     public class ModeRunnerService : IModeRunner
     {
-        private readonly ITestUpdater _testUpdater;
+        private readonly ITestUpdaterService _testUpdater;
         private readonly ICodeMonitor _codeMonitor;
         private readonly IConsoleService _consoleService;
         private readonly ProjectConfigModel _projectConfig;
 
-        public ModeRunnerService(ITestUpdater testUpdater, ICodeMonitor codeMonitor, IConsoleService consoleService, ProjectConfigModel projectConfig)
+        public ModeRunnerService(ITestUpdaterService testUpdater, ICodeMonitor codeMonitor, IConsoleService consoleService, ProjectConfigModel projectConfig)
         {
             _testUpdater = testUpdater ?? throw new ArgumentNullException(nameof(testUpdater));
             _codeMonitor = codeMonitor ?? throw new ArgumentNullException(nameof(codeMonitor));

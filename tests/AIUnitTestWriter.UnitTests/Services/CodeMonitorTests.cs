@@ -1,18 +1,19 @@
 ﻿using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.Wrappers;
 using Moq;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
     public class CodeMonitorTests
     {
-        private readonly Mock<ITestUpdater> _mockTestUpdater;
+        private readonly Mock<ITestUpdaterService> _mockTestUpdater;
         private readonly Mock<IFileWatcherWrapper> _mockFileWatcher;
         private readonly CodeMonitor _codeMonitor;
 
         public CodeMonitorTests()
         {
-            _mockTestUpdater = new Mock<ITestUpdater>();
+            _mockTestUpdater = new Mock<ITestUpdaterService>();
             _mockFileWatcher = new Mock<IFileWatcherWrapper>();
             _codeMonitor = new CodeMonitor(_mockTestUpdater.Object, _mockFileWatcher.Object);
         }

@@ -2,6 +2,7 @@
 using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.Services.Interfaces;
 using AIUnitTestWriter.SettingOptions;
+using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Options;
 using Moq;
 using Octokit;
@@ -11,7 +12,7 @@ namespace AIUnitTestWriter.UnitTests.Services
     public class GitMonitorServiceTests
     {
         private readonly Mock<IGitProcessService> _gitProcessServiceMock;
-        private readonly Mock<ITestUpdater> _testUpdaterMock;
+        private readonly Mock<ITestUpdaterService> _testUpdaterMock;
         private readonly Mock<IConsoleService> _consoleServiceMock;
         private readonly Mock<IGitHubClientWrapper> _mockGitHubClientWrapper;
         private readonly Mock<IDelayService> _delayServiceMock;
@@ -22,7 +23,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         public GitMonitorServiceTests()
         {
             _gitProcessServiceMock = new Mock<IGitProcessService>();
-            _testUpdaterMock = new Mock<ITestUpdater>();
+            _testUpdaterMock = new Mock<ITestUpdaterService>();
             _consoleServiceMock = new Mock<IConsoleService>();
             _mockGitHubClientWrapper = new Mock<IGitHubClientWrapper>();
             _delayServiceMock = new Mock<IDelayService>();

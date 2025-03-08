@@ -7,7 +7,7 @@ namespace AIUnitTestWriter.UnitTests.Services
 {
     public class ModeRunnerServiceTests
     {
-        private readonly Mock<ITestUpdater> _mockTestUpdater;
+        private readonly Mock<ITestUpdaterService> _mockTestUpdater;
         private readonly Mock<ICodeMonitor> _mockCodeMonitor;
         private readonly Mock<IConsoleService> _mockConsoleService;
         private readonly ProjectConfigModel _projectConfig;
@@ -15,7 +15,7 @@ namespace AIUnitTestWriter.UnitTests.Services
 
         public ModeRunnerServiceTests()
         {
-            _mockTestUpdater = new Mock<ITestUpdater>();
+            _mockTestUpdater = new Mock<ITestUpdaterService>();
             _mockCodeMonitor = new Mock<ICodeMonitor>();
             _mockConsoleService = new Mock<IConsoleService>();
 

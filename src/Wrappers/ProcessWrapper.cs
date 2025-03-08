@@ -1,7 +1,6 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
-namespace AIUnitTestWriter.Services.Git
+namespace AIUnitTestWriter.Wrappers
 {
     public class ProcessWrapper : IProcessWrapper
     {

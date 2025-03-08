@@ -1,9 +1,8 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
-using AIUnitTestWriter.SettingOptions;
+﻿using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
 using Octokit;
 
-namespace AIUnitTestWriter.Services.Git
+namespace AIUnitTestWriter.Wrappers
 {
     public class GitHubClientWrapper : IGitHubClientWrapper
     {

@@ -1,4 +1,5 @@
 ﻿using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.Wrappers;
 using System.Diagnostics;
 
 namespace AIUnitTestWriter.Services.Git

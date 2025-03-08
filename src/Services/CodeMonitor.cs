@@ -1,10 +1,11 @@
 ﻿using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.Wrappers;
 
 namespace AIUnitTestWriter.Services
 {
     public class CodeMonitor : ICodeMonitor
     {
-        private readonly ITestUpdater _testUpdater;
+        private readonly ITestUpdaterService _testUpdater;
         private readonly IFileWatcherWrapper _fileWatcher;
         private readonly Dictionary<string, Timer> _debounceTimers = new();
         private readonly object _timerLock = new();
@@ -15,7 +16,7 @@ namespace AIUnitTestWriter.Services
         private string _sampleUnitTest = string.Empty;
         private bool _promptUser = true;
 
-        public CodeMonitor(ITestUpdater testUpdater, IFileWatcherWrapper fileWatcher)
+        public CodeMonitor(ITestUpdaterService testUpdater, IFileWatcherWrapper fileWatcher)
         {
             _testUpdater = testUpdater ?? throw new ArgumentNullException(nameof(testUpdater));
             _fileWatcher = fileWatcher ?? throw new ArgumentNullException(nameof(fileWatcher));

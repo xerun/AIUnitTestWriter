@@ -3,6 +3,7 @@ using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Services.Interfaces;
 using Microsoft.Extensions.Options;
 using Octokit;
+using AIUnitTestWriter.Wrappers;
 
 namespace AIUnitTestWriter.Services.Git
 {
@@ -15,12 +16,12 @@ namespace AIUnitTestWriter.Services.Git
         private readonly IGitHubClientWrapper _gitHubClient;
         private readonly GitSettings _gitSettings;
         private readonly IGitProcessService _gitProcessService;
-        private readonly ITestUpdater _testUpdater;
+        private readonly ITestUpdaterService _testUpdater;
         private readonly IConsoleService _consoleService;
         private readonly ProjectConfigModel _projectConfig;
         private readonly IDelayService _delayService;        
 
-        public GitMonitorService(IOptions<GitSettings> gitSetting, ProjectConfigModel projectConfig, IGitProcessService gitProcessService, IGitHubClientWrapper gitHubClientWrapper, ITestUpdater testUpdater, IConsoleService consoleService, IDelayService delayService)
+        public GitMonitorService(IOptions<GitSettings> gitSetting, ProjectConfigModel projectConfig, IGitProcessService gitProcessService, IGitHubClientWrapper gitHubClientWrapper, ITestUpdaterService testUpdater, IConsoleService consoleService, IDelayService delayService)
         {
             _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
             _testUpdater = testUpdater ?? throw new ArgumentNullException(nameof(testUpdater));

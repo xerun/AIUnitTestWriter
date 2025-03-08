@@ -1,6 +1,4 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
-
-namespace AIUnitTestWriter.Services
+﻿namespace AIUnitTestWriter.Wrappers
 {
     public class FileWatcherWrapper : IFileWatcherWrapper
     {

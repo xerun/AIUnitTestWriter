@@ -1,5 +1,5 @@
 ﻿using AIUnitTestWriter.Services.Git;
-using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.Wrappers;
 using Moq;
 using System.Diagnostics;
 

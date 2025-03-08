@@ -1,6 +1,6 @@
 ﻿using Octokit;
 
-namespace AIUnitTestWriter.Services.Interfaces
+namespace AIUnitTestWriter.Wrappers
 {
     public interface IGitHubClientWrapper
     {

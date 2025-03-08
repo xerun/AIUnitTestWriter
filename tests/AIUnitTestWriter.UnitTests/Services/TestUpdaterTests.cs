@@ -1,6 +1,9 @@
-﻿using AIUnitTestWriter.Models;
+﻿using AIUnitTestWriter.Enum;
+using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -12,7 +15,8 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly Mock<ICodeAnalyzer> _mockCodeAnalyzer;
         private readonly Mock<IConsoleService> _mockConsoleService;
         private readonly MockFileSystem _mockFileSystem;
-        private readonly TestUpdater _testUpdater;
+        private readonly ITestUpdaterService _testUpdater;
+        private readonly IOptions<AISettings> _mockAISettings;
 
         public TestUpdaterTests()
         {
@@ -20,12 +24,24 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockCodeAnalyzer = new Mock<ICodeAnalyzer>();
             _mockConsoleService = new Mock<IConsoleService>();
             _mockFileSystem = new MockFileSystem();
+            _mockAISettings = Options.Create(new AISettings
+            {
+                Prompt = "TestPrompt",
+                ApiKey = "test-key",
+                Provider = AIProvider.Ollama,
+                Endpoint = "https://api.openai.com/v1/completions",
+                Model = "gpt-4",
+                MaxTokens = 100,
+                Temperature = 0.7,
+                PreviewResult = false
+            });
 
-            _testUpdater = new TestUpdater(
+            _testUpdater = new TestUpdaterService(
                 _mockAiService.Object,
                 _mockCodeAnalyzer.Object,
                 _mockConsoleService.Object,
-                _mockFileSystem
+                _mockFileSystem,
+                _mockAISettings
             );
         }
 

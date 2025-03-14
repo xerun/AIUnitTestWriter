@@ -1,5 +1,5 @@
-﻿using AIUnitTestWriter.Services;
-using AIUnitTestWriter.Services.Interfaces;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.Services;
 using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
 using Moq;

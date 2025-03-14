@@ -1,6 +1,6 @@
 ﻿using AIUnitTestWriter.Models;
 
-namespace AIUnitTestWriter.Services.Interfaces
+namespace AIUnitTestWriter.Interfaces
 {
     public interface IProjectInitializer
     {

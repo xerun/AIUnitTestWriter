@@ -1,4 +1,4 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
+﻿using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Wrappers;
 using System.Diagnostics;
 

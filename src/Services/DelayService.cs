@@ -1,4 +1,4 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
+﻿using AIUnitTestWriter.Interfaces;
 
 namespace AIUnitTestWriter.Services
 {

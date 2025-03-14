@@ -1,4 +1,4 @@
-﻿namespace AIUnitTestWriter.Services.Interfaces
+﻿namespace AIUnitTestWriter.Interfaces
 {
     public interface IGitProcessService
     {

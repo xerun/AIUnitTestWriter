@@ -1,19 +1,22 @@
-﻿namespace AIUnitTestWriter
-{
-    public static class SkippedFilesManager
-    {
-        public static readonly HashSet<string> SkippedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Program.cs",
-            "Startup.cs",
-            "AssemblyInfo.cs",
-            "GlobalUsings.cs",
-            "Usings.cs"
-        };
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Options;
 
-        public static bool ShouldSkip(string filePath)
+namespace AIUnitTestWriter
+{
+    public class SkippedFilesManager : ISkippedFilesManager
+    {
+        private readonly HashSet<string> _skippedFiles;
+
+        public SkippedFilesManager(IOptions<SkippedFilesSettings> options)
         {
-            return SkippedFiles.Contains(Path.GetFileName(filePath));
+            _skippedFiles = new HashSet<string>(options.Value.SkippedFiles, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <inheritdoc/>
+        public bool ShouldSkip(string filePath)
+        {
+            return _skippedFiles.Contains(Path.GetFileName(filePath));
         }
     }
 }

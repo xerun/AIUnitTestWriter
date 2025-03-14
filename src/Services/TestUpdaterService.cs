@@ -1,5 +1,5 @@
-﻿using AIUnitTestWriter.Models;
-using AIUnitTestWriter.Services.Interfaces;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.Models;
 using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
 using System.IO.Abstractions;
@@ -11,7 +11,8 @@ namespace AIUnitTestWriter.Services
         private readonly IAIApiService _aiService;
         private readonly ICodeAnalyzer _codeAnalyzer;
         private readonly IConsoleService _consoleService;
-        private readonly IFileSystem _fileSystem;
+        private readonly IFileSystem _fileSystem;        
+        private readonly ISkippedFilesManager _skippedFilesManager;
         private readonly AISettings _aiSettings;
 
         private const int SourceLineThreshold = 300;
@@ -22,12 +23,14 @@ namespace AIUnitTestWriter.Services
             ICodeAnalyzer codeAnalyzer,
             IConsoleService consoleService,
             IFileSystem fileSystem,
+            ISkippedFilesManager skippedFilesManager,
             IOptions<AISettings> aiSettings)
         {
             _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
             _codeAnalyzer = codeAnalyzer ?? throw new ArgumentNullException(nameof(codeAnalyzer));
             _consoleService = consoleService ?? throw new ArgumentNullException(nameof(consoleService));
             _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+            _skippedFilesManager = skippedFilesManager ?? throw new ArgumentNullException(nameof(skippedFilesManager));
             _aiSettings = aiSettings?.Value ?? throw new ArgumentNullException(nameof(aiSettings));
         }
 
@@ -42,7 +45,7 @@ namespace AIUnitTestWriter.Services
             try
             {
                 // Check if the file is in the predefined skip list
-                if (SkippedFilesManager.ShouldSkip(filePath))
+                if (_skippedFilesManager.ShouldSkip(filePath))
                 {
                     _consoleService.WriteColored($"Skipped file (in predefined list): {filePath}", ConsoleColor.DarkGray);
                     return null;

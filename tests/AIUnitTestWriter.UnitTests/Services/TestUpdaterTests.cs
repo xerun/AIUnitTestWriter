@@ -1,7 +1,7 @@
 ﻿using AIUnitTestWriter.Enum;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services;
-using AIUnitTestWriter.Services.Interfaces;
 using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -14,6 +14,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly Mock<IAIApiService> _mockAiService;
         private readonly Mock<ICodeAnalyzer> _mockCodeAnalyzer;
         private readonly Mock<IConsoleService> _mockConsoleService;
+        private readonly Mock<ISkippedFilesManager> _mockSkippedFilesManager;
         private readonly MockFileSystem _mockFileSystem;
         private readonly ITestUpdaterService _testUpdater;
         private readonly IOptions<AISettings> _mockAISettings;
@@ -23,6 +24,7 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockAiService = new Mock<IAIApiService>();
             _mockCodeAnalyzer = new Mock<ICodeAnalyzer>();
             _mockConsoleService = new Mock<IConsoleService>();
+            _mockSkippedFilesManager = new Mock<ISkippedFilesManager>();
             _mockFileSystem = new MockFileSystem();
             _mockAISettings = Options.Create(new AISettings
             {
@@ -41,8 +43,26 @@ namespace AIUnitTestWriter.UnitTests.Services
                 _mockCodeAnalyzer.Object,
                 _mockConsoleService.Object,
                 _mockFileSystem,
+                _mockSkippedFilesManager.Object,
                 _mockAISettings
             );
+        }
+
+        [Fact]
+        public async Task ProcessFileChange_ShouldSkipFile_ReturnsNull()
+        {
+            // Arrange
+            var filePath = "Program.cs";
+            _mockSkippedFilesManager
+                .Setup(x => x.ShouldSkip(filePath))
+                .Returns(true);
+
+            // Act
+            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
+
+            // Assert
+            Assert.Null(result);
+            _mockConsoleService.Verify(x => x.WriteColored(It.IsAny<string>(), ConsoleColor.DarkGray), Times.Once);
         }
 
         [Fact]
@@ -50,6 +70,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\path\to\file.cs";
+            _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             _mockFileSystem.AddFile(filePath, new MockFileData("public interface IMyInterface {}"));
 
             // Act
@@ -65,6 +86,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\path\to\file.cs";
+            _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             _mockFileSystem.AddFile(filePath, new MockFileData("public class MyClass {}"));
             _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string>());
 
@@ -81,6 +103,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\path\to\file.cs";
+            _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             var longSourceCode = @"public class MyClass { public void MyMethod() {} }";
 
             // Make the source code 600 characters long
@@ -104,6 +127,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\src\path\to\file.cs";
+            _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             var sourceCode = "public class MyClass { public void MyMethod() {} }";
             _mockFileSystem.AddFile(filePath, new MockFileData(sourceCode));
             _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });

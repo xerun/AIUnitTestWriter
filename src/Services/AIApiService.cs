@@ -1,5 +1,5 @@
 ﻿using AIUnitTestWriter.Enum;
-using AIUnitTestWriter.Services.Interfaces;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Options;

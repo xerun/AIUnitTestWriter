@@ -1,5 +1,5 @@
-﻿using AIUnitTestWriter.Models;
-using AIUnitTestWriter.Services.Interfaces;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.Models;
 
 namespace AIUnitTestWriter
 {

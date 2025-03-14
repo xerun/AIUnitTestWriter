@@ -1,4 +1,4 @@
-﻿using AIUnitTestWriter.Services.Interfaces;
+﻿using AIUnitTestWriter.Interfaces;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

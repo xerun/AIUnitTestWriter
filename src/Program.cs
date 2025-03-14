@@ -1,6 +1,6 @@
-﻿using AIUnitTestWriter.Services;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Git;
-using AIUnitTestWriter.Services.Interfaces;
 using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Configuration;
@@ -34,6 +34,7 @@ namespace AIUnitTestWriter
                     services.Configure<ProjectSettings>(context.Configuration.GetSection("Project"));
                     services.Configure<AISettings>(context.Configuration.GetSection("AI"));
                     services.Configure<GitSettings>(context.Configuration.GetSection("Git"));
+                    services.Configure<SkippedFilesSettings>(context.Configuration.GetSection("SkippedFiles"));
 
                     // Register your services.
                     services.AddSingleton<IProjectInitializer, ProjectInitializerService>();
@@ -41,12 +42,13 @@ namespace AIUnitTestWriter
                     {
                         var initializer = provider.GetRequiredService<IProjectInitializer>();
                         return initializer.Initialize();
-                    });
+                    });                    
                     services.AddSingleton<IHttpRequestMessageFactory, HttpRequestMessageFactory>();
                     services.AddSingleton<IGitProcessFactory, GitProcessFactory>();
                     services.AddSingleton<IFileSystem, FileSystem>();
                     services.AddSingleton<IFileWatcherWrapper, FileWatcherWrapper>();
                     services.AddSingleton<IDelayService, DelayService>();
+                    services.AddSingleton<ISkippedFilesManager, SkippedFilesManager>();
                     services.AddSingleton<IModeRunner, ModeRunnerService>();
                     services.AddSingleton<IAIApiService, AIApiService>();
                     services.AddSingleton<ICodeMonitor, CodeMonitor>();

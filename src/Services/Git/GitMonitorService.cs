@@ -1,9 +1,9 @@
 ﻿using AIUnitTestWriter.Models;
 using AIUnitTestWriter.SettingOptions;
-using AIUnitTestWriter.Services.Interfaces;
 using Microsoft.Extensions.Options;
 using Octokit;
 using AIUnitTestWriter.Wrappers;
+using AIUnitTestWriter.Interfaces;
 
 namespace AIUnitTestWriter.Services.Git
 {
@@ -18,10 +18,11 @@ namespace AIUnitTestWriter.Services.Git
         private readonly IGitProcessService _gitProcessService;
         private readonly ITestUpdaterService _testUpdater;
         private readonly IConsoleService _consoleService;
+        private readonly ISkippedFilesManager _skippedFilesManager;
         private readonly ProjectConfigModel _projectConfig;
         private readonly IDelayService _delayService;        
 
-        public GitMonitorService(IOptions<GitSettings> gitSetting, ProjectConfigModel projectConfig, IGitProcessService gitProcessService, IGitHubClientWrapper gitHubClientWrapper, ITestUpdaterService testUpdater, IConsoleService consoleService, IDelayService delayService)
+        public GitMonitorService(IOptions<GitSettings> gitSetting, ProjectConfigModel projectConfig, IGitProcessService gitProcessService, IGitHubClientWrapper gitHubClientWrapper, ITestUpdaterService testUpdater, IConsoleService consoleService, IDelayService delayService, ISkippedFilesManager skippedFilesManager)
         {
             _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
             _testUpdater = testUpdater ?? throw new ArgumentNullException(nameof(testUpdater));
@@ -30,6 +31,7 @@ namespace AIUnitTestWriter.Services.Git
             _consoleService = consoleService ?? throw new ArgumentNullException(nameof(consoleService));
             _gitHubClient = gitHubClientWrapper ?? throw new ArgumentNullException(nameof(gitHubClientWrapper));
             _delayService = delayService ?? throw new ArgumentNullException(nameof(delayService));
+            _skippedFilesManager = skippedFilesManager ?? throw new ArgumentNullException(nameof(skippedFilesManager));
             _repositoryPath = _gitSettings.LocalRepositoryPath;
             _branchPrefix = _gitSettings.BranchPrefix;            
             
@@ -139,7 +141,7 @@ namespace AIUnitTestWriter.Services.Git
                       .Select(line => line.Trim())
                       .Where(line => !string.IsNullOrWhiteSpace(line) &&
                                      line.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
-                                     !SkippedFilesManager.ShouldSkip(line)) // Combined conditions
+                                     !_skippedFilesManager.ShouldSkip(line)) // Combined conditions
                       .ToList();
 
             _consoleService.WriteColored($"Pulled changes detected: {string.Join(", ", files)}", ConsoleColor.Cyan);

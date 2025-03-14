@@ -1,7 +1,7 @@
 ﻿using AIUnitTestWriter.Models;
 using AIUnitTestWriter.SettingOptions;
-using AIUnitTestWriter.Services.Interfaces;
 using Microsoft.Extensions.Options;
+using AIUnitTestWriter.Interfaces;
 
 namespace AIUnitTestWriter.Services
 {
@@ -57,33 +57,40 @@ namespace AIUnitTestWriter.Services
             config.SrcFolder = Path.Combine(config.ProjectPath, srcFolderName);
             config.TestsFolder = Path.Combine(config.ProjectPath, testsFolderName);
 
-            string sampleResponse = _consoleService.Prompt("Would you like to provide a sample unit test file for reference? (Y/N)", ConsoleColor.DarkYellow);
-            int retryCount = 0;
-            int maxRetries = 3; // Limit retries for testability
-            if (sampleResponse.Equals("y", StringComparison.OrdinalIgnoreCase) ||
-                sampleResponse.Equals("yes", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(_projectSettings.SampleUnitTest))
             {
-                string sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
-                while ((string.IsNullOrWhiteSpace(sampleFilePath) || !File.Exists(sampleFilePath)) && retryCount < maxRetries)
-                {
-                    _consoleService.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red);
-                    sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
-                    retryCount++;
-                }
-                
-                if (retryCount == maxRetries && string.IsNullOrWhiteSpace(sampleFilePath))
-                {
-                    _consoleService.WriteColored("Maximum retry limit reached. Skipping sample file selection.", ConsoleColor.Red);
-                    config.SampleUnitTestContent = string.Empty;
-                }
-                else
-                {
-                    config.SampleUnitTestContent = File.ReadAllText(sampleFilePath);
-                }
+                config.SampleUnitTestContent = File.ReadAllText(_projectSettings.SampleUnitTest);
             }
             else
             {
-                config.SampleUnitTestContent = string.Empty;
+                string sampleResponse = _consoleService.Prompt("Would you like to provide a sample unit test file for reference? (Y/N)", ConsoleColor.DarkYellow);
+                int retryCount = 0;
+                int maxRetries = 3; // Limit retries for testability
+                if (sampleResponse.Equals("y", StringComparison.OrdinalIgnoreCase) ||
+                    sampleResponse.Equals("yes", StringComparison.OrdinalIgnoreCase))
+                {
+                    string sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
+                    while ((string.IsNullOrWhiteSpace(sampleFilePath) || !File.Exists(sampleFilePath)) && retryCount < maxRetries)
+                    {
+                        _consoleService.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red);
+                        sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
+                        retryCount++;
+                    }
+
+                    if (retryCount == maxRetries && string.IsNullOrWhiteSpace(sampleFilePath))
+                    {
+                        _consoleService.WriteColored("Maximum retry limit reached. Skipping sample file selection.", ConsoleColor.Red);
+                        config.SampleUnitTestContent = string.Empty;
+                    }
+                    else
+                    {
+                        config.SampleUnitTestContent = File.ReadAllText(sampleFilePath);
+                    }
+                }
+                else
+                {
+                    config.SampleUnitTestContent = string.Empty;
+                }
             }
 
             return config;

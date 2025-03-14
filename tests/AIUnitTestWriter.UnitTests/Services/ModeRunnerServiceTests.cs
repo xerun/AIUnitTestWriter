@@ -1,6 +1,6 @@
-﻿using AIUnitTestWriter.Models;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services;
-using AIUnitTestWriter.Services.Interfaces;
 using Moq;
 
 namespace AIUnitTestWriter.UnitTests.Services

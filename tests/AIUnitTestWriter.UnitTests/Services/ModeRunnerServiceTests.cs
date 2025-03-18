@@ -7,6 +7,7 @@ namespace AIUnitTestWriter.UnitTests.Services
 {
     public class ModeRunnerServiceTests
     {
+        private readonly CancellationToken _cancellationToken = CancellationToken.None;
         private readonly Mock<ITestUpdaterService> _mockTestUpdater;
         private readonly Mock<ICodeMonitor> _mockCodeMonitor;
         private readonly Mock<IConsoleService> _mockConsoleService;
@@ -45,7 +46,7 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockConsoleService.Verify(m => m.WriteColored($"Monitoring source folder: {_projectConfig.SrcFolder}", ConsoleColor.Green), Times.Once);
             _mockConsoleService.Verify(m => m.WriteColored($"Tests will be updated in: {_projectConfig.TestsFolder}", ConsoleColor.Green), Times.Once);
             _mockConsoleService.Verify(m => m.WriteColored("Auto-detect mode activated. Monitoring code changes, press any key to exit.", ConsoleColor.Blue), Times.Once);
-            _mockCodeMonitor.Verify(m => m.Start(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, false), Times.Once);
+            _mockCodeMonitor.Verify(m => m.StartAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, false, _cancellationToken), Times.Once);
         }
 
         [Fact]
@@ -91,7 +92,7 @@ namespace AIUnitTestWriter.UnitTests.Services
                                .Returns("y") // Approve test update
                                .Returns("exit"); // Exit loop
 
-            _mockTestUpdater.Setup(m => m.ProcessFileChange(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true))
+            _mockTestUpdater.Setup(m => m.ProcessFileChangeAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true, _cancellationToken))
                             .ReturnsAsync(testResult);
 
             // Act
@@ -114,7 +115,7 @@ namespace AIUnitTestWriter.UnitTests.Services
                                .Returns("n") // Reject update
                                .Returns("exit"); // Exit loop
 
-            _mockTestUpdater.Setup(m => m.ProcessFileChange(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true))
+            _mockTestUpdater.Setup(m => m.ProcessFileChangeAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true, _cancellationToken))
                             .ReturnsAsync(testResult);
 
             // Act

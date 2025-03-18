@@ -6,6 +6,7 @@ namespace AIUnitTestWriter.UnitTests
 {
     public class AppStarterTests
     {
+        private readonly CancellationToken _cancellationToken = CancellationToken.None;
         private readonly Mock<IModeRunner> _modeRunnerMock;
         private readonly Mock<IGitMonitorService> _gitIntegrationServiceMock;
         private readonly Mock<IConsoleService> _consoleServiceMock;
@@ -34,7 +35,7 @@ namespace AIUnitTestWriter.UnitTests
             _projectConfig.IsGitRepository = true;
             _consoleServiceMock.Setup(s => s.ReadLine()).Returns(string.Empty);
             // Act
-            await _appStarter.RunAsync();
+            await _appStarter.RunAsync(_cancellationToken);
 
             // Assert
             _consoleServiceMock.Verify(c => c.WriteColored("Git repository mode detected.", ConsoleColor.Green), Times.Once);
@@ -50,10 +51,10 @@ namespace AIUnitTestWriter.UnitTests
                 .Returns("A");
 
             // Act
-            await _appStarter.RunAsync();
+            await _appStarter.RunAsync(_cancellationToken);
 
             // Assert
-            _modeRunnerMock.Verify(m => m.RunAutoModeAsync(), Times.Once);
+            _modeRunnerMock.Verify(m => m.RunAutoModeAsync(_cancellationToken), Times.Once);
         }
 
         [Fact]
@@ -65,10 +66,10 @@ namespace AIUnitTestWriter.UnitTests
                 .Returns("M");
 
             // Act
-            await _appStarter.RunAsync();
+            await _appStarter.RunAsync(_cancellationToken);
 
             // Assert
-            _modeRunnerMock.Verify(m => m.RunManualModeAsync(), Times.Once);
+            _modeRunnerMock.Verify(m => m.RunManualModeAsync(_cancellationToken), Times.Once);
         }
 
         [Fact]
@@ -80,7 +81,7 @@ namespace AIUnitTestWriter.UnitTests
                 .Returns("invalid");
 
             // Act
-            await _appStarter.RunAsync();
+            await _appStarter.RunAsync(_cancellationToken);
 
             // Assert
             _consoleServiceMock.Verify(c => c.WriteColored("Invalid mode selected. Exiting program.", ConsoleColor.Red), Times.Once);

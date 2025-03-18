@@ -18,13 +18,13 @@ namespace AIUnitTestWriter
             _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
         }
 
-        public async Task RunAsync()
+        public async Task RunAsync(CancellationToken cancellationToken)
         {
             if (_projectConfig.IsGitRepository)
             {
                 // If the project comes from a Git repository, use the Git integration service.
                 _consoleService.WriteColored("Git repository mode detected.", ConsoleColor.Green);
-                await _gitIntegrationService.MonitorAndTriggerAsync();
+                await _gitIntegrationService.MonitorAndTriggerAsync(cancellationToken);
                 _consoleService.WriteColored("Git monitoring and pull request creation activated, press any key to exit.", ConsoleColor.Blue);
                 _consoleService.ReadLine();
             }
@@ -36,11 +36,11 @@ namespace AIUnitTestWriter
 
                 if (mode == "a" || mode == "auto")
                 {
-                    await _modeRunner.RunAutoModeAsync();
+                    await _modeRunner.RunAutoModeAsync(cancellationToken);
                 }
                 else if (mode == "m" || mode == "manual")
                 {
-                    await _modeRunner.RunManualModeAsync();
+                    await _modeRunner.RunManualModeAsync(cancellationToken);
                 }
                 else
                 {

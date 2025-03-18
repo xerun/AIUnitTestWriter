@@ -3,6 +3,8 @@ using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Options;
+using OpenAI.Chat;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -11,22 +13,23 @@ namespace AIUnitTestWriter.Services
 {
     public class AIApiService : IAIApiService
     {
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientWrapper _httpClient;
         private readonly IHttpRequestMessageFactory _requestFactory;
+        private readonly IAzureOpenAIClient _openAIClient;
         private readonly AISettings _aiSettings;
         private readonly string _apiKey;
         private readonly string _endpoint;
         private readonly string _model;
         private readonly int _maxTokens;
-        private readonly double _temperature;
+        private readonly float _temperature;
         private readonly AIProvider _provider;
 
-        public AIApiService(IOptions<AISettings> aiSettings, IHttpClientFactory httpClientFactory, IHttpRequestMessageFactory requestFactory)
+        public AIApiService(IOptions<AISettings> aiSettings, IHttpClientWrapper httpClientWrapper, IHttpRequestMessageFactory requestFactory, IAzureOpenAIClient openAIClient)
         {
-            if (httpClientFactory == null) throw new ArgumentNullException(nameof(httpClientFactory));
-            _httpClient = httpClientFactory.CreateClient();
+            _httpClient = httpClientWrapper ?? throw new ArgumentNullException(nameof(httpClientWrapper));
             _requestFactory = requestFactory ?? throw new ArgumentNullException(nameof(requestFactory));
             _aiSettings = aiSettings?.Value ?? throw new ArgumentNullException(nameof(aiSettings));
+            _openAIClient = openAIClient ?? throw new ArgumentNullException(nameof(openAIClient));
 
             _apiKey = _aiSettings.ApiKey;
             _provider = _aiSettings.Provider;
@@ -36,19 +39,19 @@ namespace AIUnitTestWriter.Services
             _temperature = _aiSettings.Temperature;
         }
 
-        public async Task<string> GenerateTestsAsync(string prompt)
+        /// <inheritdoc/>
+        [ExcludeFromCodeCoverage(Justification = "All the related methods are already tested.")]
+        public async Task<string> GenerateTestsAsync(string prompt, CancellationToken cancellationToken = default)
         {
-            if (_provider == AIProvider.Ollama)
+            return _provider switch
             {
-                return await GenerateTestsOllama(prompt);
-            }
-            else
-            {
-                return await GenerateTestsOpenAI(prompt);
-            }
+                AIProvider.Ollama => await GenerateTestsOllamaAsync(prompt, cancellationToken),
+                AIProvider.AzureOpenAI => await GenerateTestsAzureOpenAIAsync(prompt, cancellationToken),
+                _ => await GenerateTestsOpenAIAsync(prompt, cancellationToken),
+            };
         }
 
-        private async Task<string> GenerateTestsOpenAI(string prompt)
+        internal async Task<string> GenerateTestsOpenAIAsync(string prompt, CancellationToken cancellationToken = default)
         {
             var requestBody = new
             {
@@ -65,14 +68,14 @@ namespace AIUnitTestWriter.Services
             // Use API key for OpenAI.
             var request = _requestFactory.Create(HttpMethod.Post, _endpoint, httpContent, _apiKey);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"OpenAI API request failed: {response.StatusCode}");
                 return string.Empty;
             }
 
-            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
 
             using (var doc = JsonDocument.Parse(jsonResponse))
             {
@@ -90,9 +93,8 @@ namespace AIUnitTestWriter.Services
             return string.Empty;
         }
 
-        private async Task<string> GenerateTestsOllama(string prompt)
+        internal async Task<string> GenerateTestsOllamaAsync(string prompt, CancellationToken cancellationToken = default)
         {
-            // For Ollama, the payload may be similar but could be adjusted as needed.
             var requestBody = new
             {
                 model = _model,
@@ -107,14 +109,14 @@ namespace AIUnitTestWriter.Services
 
             var request = _requestFactory.Create(HttpMethod.Post, _endpoint, httpContent, _apiKey);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"Ollama API request failed: {response.StatusCode}");
                 return string.Empty;
             }
 
-            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
             var generatedText = string.Empty;
 
             using (var doc = JsonDocument.Parse(jsonResponse))
@@ -137,6 +139,30 @@ namespace AIUnitTestWriter.Services
             }
 
             return generatedText;
+        }
+
+        internal async Task<string> GenerateTestsAzureOpenAIAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            var chatClient = _openAIClient.GetChatClient(_model);
+
+            var options = new ChatCompletionOptions
+            {
+                Temperature = _temperature,
+                MaxOutputTokenCount = _maxTokens
+            };
+
+            var generatedText = await chatClient.CompleteChatAsync(
+                new List<ChatMessage>
+                {
+                    new SystemChatMessage("You are a helpful AI that generates unit tests."),
+                    new UserChatMessage(prompt)
+                }, options, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(generatedText))
+            {
+                return string.Empty;
+            }
+            return generatedText.Trim();
         }
     }
 }

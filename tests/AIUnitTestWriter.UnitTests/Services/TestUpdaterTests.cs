@@ -11,6 +11,7 @@ namespace AIUnitTestWriter.UnitTests.Services
 {
     public class TestUpdaterTests
     {
+        private readonly CancellationToken _cancellationToken = CancellationToken.None;
         private readonly Mock<IAIApiService> _mockAiService;
         private readonly Mock<ICodeAnalyzer> _mockCodeAnalyzer;
         private readonly Mock<IConsoleService> _mockConsoleService;
@@ -34,7 +35,7 @@ namespace AIUnitTestWriter.UnitTests.Services
                 Endpoint = "https://api.openai.com/v1/completions",
                 Model = "gpt-4",
                 MaxTokens = 100,
-                Temperature = 0.7,
+                Temperature = 0.7f,
                 PreviewResult = false
             });
 
@@ -58,7 +59,7 @@ namespace AIUnitTestWriter.UnitTests.Services
                 .Returns(true);
 
             // Act
-            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
+            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.Null(result);
@@ -74,7 +75,7 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockFileSystem.AddFile(filePath, new MockFileData("public interface IMyInterface {}"));
 
             // Act
-            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
+            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.Null(result);
@@ -91,7 +92,7 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string>());
 
             // Act
-            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
+            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.Null(result);
@@ -113,10 +114,10 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Yellow)).Returns("TestMethod");
             _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
             _mockCodeAnalyzer.Setup(ca => ca.GetMethodCode(It.IsAny<string>(), "TestMethod")).Returns("public void TestMethod() {}");
-            _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("Generated Test Code");
+            _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>(), _cancellationToken)).ReturnsAsync("Generated Test Code");
 
             // Act
-            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
+            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.NotNull(result);            
@@ -132,10 +133,10 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockFileSystem.AddFile(filePath, new MockFileData(sourceCode));
             _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
 
-            _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>())).ReturnsAsync("Generated Test Code");
+            _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>(), _cancellationToken)).ReturnsAsync("Generated Test Code");
 
             // Act
-            var result = await _testUpdater.ProcessFileChange(@"C:\src", @"C:\tests", filePath);
+            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.NotNull(result);

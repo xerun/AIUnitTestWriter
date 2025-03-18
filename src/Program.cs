@@ -3,9 +3,11 @@ using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
+using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenAI.Chat;
 using System.IO.Abstractions;
 
 namespace AIUnitTestWriter
@@ -42,7 +44,10 @@ namespace AIUnitTestWriter
                     {
                         var initializer = provider.GetRequiredService<IProjectInitializer>();
                         return initializer.Initialize();
-                    });                    
+                    });
+
+                    services.AddSingleton<IAzureOpenAIClient, AzureOpenAIClientWrapper>();
+                    services.AddHttpClient<IHttpClientWrapper, HttpClientWrapper>();
                     services.AddSingleton<IHttpRequestMessageFactory, HttpRequestMessageFactory>();
                     services.AddSingleton<IGitProcessFactory, GitProcessFactory>();
                     services.AddSingleton<IFileSystem, FileSystem>();
@@ -65,7 +70,7 @@ namespace AIUnitTestWriter
                 .Build();
 
             // Run the application.
-            await host.Services.GetRequiredService<AppStarter>().RunAsync();
+            await host.Services.GetRequiredService<AppStarter>().RunAsync(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
         }
     }
 }

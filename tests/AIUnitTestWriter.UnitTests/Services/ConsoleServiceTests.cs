@@ -1,14 +1,18 @@
 ﻿using AIUnitTestWriter.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
     public class ConsoleServiceTests
     {
         private readonly ConsoleService _consoleService;
+        private readonly Mock<ILogger<ConsoleService>> _mockLogger;
 
         public ConsoleServiceTests()
         {
-            _consoleService = new ConsoleService();
+            _mockLogger = new Mock<ILogger<ConsoleService>>();
+            _consoleService = new ConsoleService(_mockLogger.Object);
         }
 
         [Fact]

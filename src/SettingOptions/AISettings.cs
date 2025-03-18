@@ -10,7 +10,7 @@ namespace AIUnitTestWriter.SettingOptions
         public string Endpoint { get; set; } = null!;
         public string Model { get; set; } = null!;
         public int MaxTokens { get; set; }
-        public double Temperature { get; set; }
+        public float Temperature { get; set; }
         public bool PreviewResult { get; set; }
     }
 }

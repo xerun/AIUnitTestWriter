@@ -1,31 +1,42 @@
 ﻿using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Services;
+using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
     public class CodeMonitorTests
     {
+        private readonly CancellationToken _cancellationToken = CancellationToken.None;
         private readonly Mock<ITestUpdaterService> _mockTestUpdater;
         private readonly Mock<IFileWatcherWrapper> _mockFileWatcher;
+        private readonly Mock<IConsoleService> _mockConsoleService;
+        private readonly IOptions<ProjectSettings> _projectSettings;
         private readonly CodeMonitor _codeMonitor;
 
         public CodeMonitorTests()
         {
             _mockTestUpdater = new Mock<ITestUpdaterService>();
             _mockFileWatcher = new Mock<IFileWatcherWrapper>();
-            _codeMonitor = new CodeMonitor(_mockTestUpdater.Object, _mockFileWatcher.Object);
+            _mockConsoleService = new Mock<IConsoleService>();
+            _projectSettings = Options.Create(new ProjectSettings
+            {
+                CodeFileExtension = ".cs"
+            });
+
+            _codeMonitor = new CodeMonitor(_mockTestUpdater.Object, _mockFileWatcher.Object, _mockConsoleService.Object, _projectSettings);
         }
 
         [Fact]
         public void Start_ShouldEnableFileWatcher()
         {
             // Act
-            _codeMonitor.Start("srcPath", "testPath");
+            _codeMonitor.StartAsync("srcPath", "testPath", cancellationToken: _cancellationToken);
 
             // Assert
-            _mockFileWatcher.Verify(fw => fw.Start("srcPath", "*.cs"), Times.Once);
+            _mockFileWatcher.Verify(fw => fw.Start("srcPath", $"*.cs"), Times.Once);
             _mockFileWatcher.VerifySet(fw => fw.EnableRaisingEvents = true, Times.Once);
         }
 
@@ -33,7 +44,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Stop_ShouldDisableFileWatcher()
         {
             // Act
-            _codeMonitor.Stop();
+            _codeMonitor.StopAsync(_cancellationToken);
 
             // Assert
             _mockFileWatcher.VerifySet(fw => fw.EnableRaisingEvents = false, Times.Once);
@@ -44,44 +55,42 @@ namespace AIUnitTestWriter.UnitTests.Services
         public async Task FileChanged_ShouldTriggerProcessFileChange()
         {
             // Arrange
-            _codeMonitor.Start("srcPath", "testPath");
+            await _codeMonitor.StartAsync("srcPath", "testPath", cancellationToken: _cancellationToken);
             var fileEvent = new FileSystemEventArgs(WatcherChangeTypes.Changed, "srcPath", "file.cs");
 
-            _mockTestUpdater.Setup(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()));
+            _mockTestUpdater.Setup(tu => tu.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), _cancellationToken));
 
             // Act
-            Task.Run(() => _codeMonitor.GetType().GetMethod("OnChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.Invoke(_codeMonitor, new object[] { this, fileEvent }));
+            await _codeMonitor.OnChanged(fileEvent, _cancellationToken);
 
             // Wait for debounce interval
             await Task.Delay(1200);
 
             // Assert
-            _mockTestUpdater.Verify(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
+            _mockTestUpdater.Verify(tu => tu.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), _cancellationToken), Times.Once);
 
-            _codeMonitor.Stop();
+            await _codeMonitor.StopAsync(_cancellationToken);
         }
 
         [Fact]
         public async Task FileRenamed_ShouldTriggerProcessFileChange()
         {
             // Arrange
-            _codeMonitor.Start("srcPath", "testPath");
+            await _codeMonitor.StartAsync("srcPath", "testPath", cancellationToken: _cancellationToken);
             var renameEvent = new RenamedEventArgs(WatcherChangeTypes.Renamed, "srcPath", "newFile.cs", "oldFile.cs");
 
-            _mockTestUpdater.Setup(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()));
+            _mockTestUpdater.Setup(tu => tu.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), _cancellationToken));
 
             // Act
-            Task.Run(() => _codeMonitor.GetType().GetMethod("OnRenamed", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.Invoke(_codeMonitor, new object[] { this, renameEvent }));
+            await _codeMonitor.OnRenamed(renameEvent, _cancellationToken);
 
             // Wait for debounce interval
             await Task.Delay(1200);
 
             // Assert
-            _mockTestUpdater.Verify(tu => tu.ProcessFileChange(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
+            _mockTestUpdater.Verify(tu => tu.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), _cancellationToken), Times.Once);
 
-            _codeMonitor.Stop();
+            await _codeMonitor.StopAsync(_cancellationToken);
         }
     }
 }

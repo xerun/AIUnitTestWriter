@@ -4,9 +4,9 @@ namespace AIUnitTestWriter.Services
 {
     public class DelayService : IDelayService
     {
-        public async Task DelayAsync(int milliseconds)
+        public async Task DelayAsync(int milliseconds, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(milliseconds);
+            await Task.Delay(milliseconds, cancellationToken);
         }
     }
 }

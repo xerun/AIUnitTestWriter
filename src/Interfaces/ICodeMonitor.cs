@@ -5,11 +5,11 @@
         /// <summary>
         /// Starts monitoring the source folder for file changes.
         /// </summary>
-        void Start(string srcFolder, string testsFolder, string sampleUnitTest = "", bool promptUser = true);
+        Task StartAsync(string srcFolder, string testsFolder, string sampleUnitTest = "", bool promptUser = true, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Stops monitoring and cleans up resources.
         /// </summary>
-        void Stop();
+        Task StopAsync(CancellationToken cancellationToken = default);
     }
 }

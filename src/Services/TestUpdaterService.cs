@@ -40,7 +40,7 @@ namespace AIUnitTestWriter.Services
         /// In manual mode, returns a TestGenerationResultModel for approval.
         /// In auto mode, finalizes immediately and returns null.
         /// </summary>
-        public async Task<TestGenerationResultModel?> ProcessFileChange(string srcFolder, string testsFolder, string filePath, string sampleUnitTest = "", bool promptUser = true)
+        public async Task<TestGenerationResultModel?> ProcessFileChangeAsync(string srcFolder, string testsFolder, string filePath, string sampleUnitTest = "", bool promptUser = true, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -101,7 +101,8 @@ namespace AIUnitTestWriter.Services
                 var prompt = GeneratePrompt(methodCodeToSend, existingTests, sampleUnitTest);
 
                 _consoleService.WriteColored("Sending code to AI for test generation...", ConsoleColor.Blue);
-                var aiResponse = await _aiService.GenerateTestsAsync(prompt);
+
+                var aiResponse = await _aiService.GenerateTestsAsync(prompt, cancellationToken);
                 if (string.IsNullOrWhiteSpace(aiResponse))
                 {
                     _consoleService.WriteColored("AI returned an empty response.", ConsoleColor.Yellow);

@@ -4,9 +4,10 @@ namespace AIUnitTestWriter.Wrappers
 {
     public class HttpRequestMessageFactory : IHttpRequestMessageFactory
     {
-        public HttpRequestMessage Create(HttpMethod method, string requestUri, HttpContent content, string apiKey)
+        /// <inheritdoc/>
+        public HttpRequestMessage Create(HttpMethod method, string url, HttpContent content, string apiKey)
         {
-            var request = new HttpRequestMessage(method, requestUri)
+            var request = new HttpRequestMessage(method, url)
             {
                 Content = content
             };

@@ -3,6 +3,7 @@
     public enum AIProvider
     {
         OpenAI,
-        Ollama
+        Ollama,
+        AzureOpenAI
     }
 }

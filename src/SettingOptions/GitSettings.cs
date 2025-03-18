@@ -6,5 +6,6 @@
         public string GitMainBranch { get; set; } = null!;
         public string GitHubToken { get; set; } = null!;
         public string BranchPrefix { get; set; } = null!;
+        public int PollInterval { get; set; } = 0;
     }
 }

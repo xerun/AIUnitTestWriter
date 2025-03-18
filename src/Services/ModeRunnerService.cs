@@ -19,19 +19,19 @@ namespace AIUnitTestWriter.Services
         }
 
         /// <inheritdoc/>
-        public async Task RunAutoModeAsync()
+        public async Task RunAutoModeAsync(CancellationToken cancellationToken = default)
         {
             _consoleService.WriteColored($"Monitoring source folder: {_projectConfig.SrcFolder}", ConsoleColor.Green);
             _consoleService.WriteColored($"Tests will be updated in: {_projectConfig.TestsFolder}", ConsoleColor.Green);
 
-            _codeMonitor.Start(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, promptUser: false);
+            await _codeMonitor.StartAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, promptUser: false, cancellationToken);
 
             _consoleService.WriteColored("Auto-detect mode activated. Monitoring code changes, press any key to exit.", ConsoleColor.Blue);
             _consoleService.ReadLine();
         }
 
         /// <inheritdoc/>
-        public async Task RunManualModeAsync()
+        public async Task RunManualModeAsync(CancellationToken cancellationToken = default)
         {
             while (true)
             {
@@ -46,7 +46,7 @@ namespace AIUnitTestWriter.Services
                     continue;
                 }
 
-                var result = await _testUpdater.ProcessFileChange(_projectConfig.SrcFolder, _projectConfig.TestsFolder, filePath, _projectConfig.SampleUnitTestContent, promptUser: true);
+                var result = await _testUpdater.ProcessFileChangeAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, filePath, _projectConfig.SampleUnitTestContent, promptUser: true, cancellationToken);
                 if (result == null)
                 {
                     continue;

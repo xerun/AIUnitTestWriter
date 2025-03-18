@@ -18,7 +18,7 @@ namespace AIUnitTestWriter.Wrappers
             };
         }
 
-        public async Task<PullRequest> CreatePullRequestAsync(string owner, string repo, NewPullRequest pr)
+        public async Task<PullRequest> CreatePullRequestAsync(string owner, string repo, NewPullRequest pr, CancellationToken cancellationToken = default)
         {
             return await _gitHubClient.PullRequest.Create(owner, repo, pr);
         }

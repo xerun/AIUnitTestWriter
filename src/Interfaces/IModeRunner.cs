@@ -6,12 +6,12 @@
         /// Run the auto mode.
         /// </summary>
         /// <returns></returns>
-        Task RunAutoModeAsync();
+        Task RunAutoModeAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Run the manual mode.
         /// </summary>
         /// <returns></returns>
-        Task RunManualModeAsync();
+        Task RunManualModeAsync(CancellationToken cancellationToken = default);
     }
 }

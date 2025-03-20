@@ -4,7 +4,7 @@
 This project is an **AI-driven code monitoring and test updating system** designed to automate unit test generation and maintenance. It continuously watches for changes in source code files and updates corresponding test files using an AI-powered service. Additionally, it can **monitor changes in a GitHub branch**, automatically generate unit tests, and create a **separate review branch** for validation.  
 
 ### **Key Features**  
-🔹 **Real-Time Code Monitoring** – Uses a `FileSystemWatcher` to detect changes in `.cs` files.  
+🔹 **Real-Time Code Monitoring** – Uses a `FileSystemWatcher` to detect changes in `.ext` (configurable) files.  
 🔹 **GitHub Branch Monitoring** – Tracks changes in a specified branch and triggers test updates.  
 🔹 **Automated Unit Test Updates** – Calls an AI service to update test files when code changes.  
 🔹 **Branch Creation for Review** – Creates a new Git branch for updated test files before merging.  
@@ -17,7 +17,7 @@ This project is an **AI-driven code monitoring and test updating system** design
    - Creates instances of `TestUpdater` and `CodeMonitor` with required dependencies.  
 
 2. **CodeMonitor** (`ICodeMonitor`)  
-   - Watches for `.cs` file changes in the source directory.  
+   - Watches for `.ext` file changes in the source directory.  
    - Uses a debounce mechanism to process file changes efficiently.  
    - Calls `TestUpdater` to update tests when necessary.  
 
@@ -40,5 +40,24 @@ This project is an **AI-driven code monitoring and test updating system** design
 4. **Update Tests** – Calls `TestUpdater`, which uses `IAIApiService` to generate new or modified tests.  
 5. **Create Review Branch** – If monitoring Git, a new branch is created with updated test files for review.  
 
+### **Run the Application**
+- **Console app** - This mode will prompt for user input and start monitoring the local code files.
+- **Background service:** - This mode will automatically start Git branch monitoring and AI-based test generation.
+
+### **Troubleshooting**
+- Issue: Git monitoring not working
+   - Ensure that the repository URL is correct.
+   - Ensure that the API key and model settings are properly configured.
+- Issue: AI-generated tests are incomplete
+   - Increase MaxTokens value in appsettings.json.
+   - Ensure that the AI service endpoint is reachable.
+
 ### **Use Case**  
-Ideal for teams practicing **Test-Driven Development (TDD)** or wanting to automate **unit test maintenance** as their code evolves. The added Git integration makes it perfect for CI/CD pipelines, ensuring that updated test cases are reviewed before merging into the main branch. 🚀
+Ideal for teams wanting to automate **unit test maintenance** as their code evolves. The added Git integration makes it perfect for CI/CD pipelines, ensuring that updated test cases are reviewed before merging into the main branch.
+
+### **Contributing**
+1. Fork the repository.
+2. Create a feature branch (git checkout -b feature/my-new-feature).
+3. Commit changes (git commit -am 'Add some feature').
+4. Push to the branch (git push origin feature/my-new-feature).
+5. Open a Pull Request.

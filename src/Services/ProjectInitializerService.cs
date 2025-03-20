@@ -22,78 +22,118 @@ namespace AIUnitTestWriter.Services
         {
             var config = new ProjectConfigModel();
 
-            config.ProjectPath = _consoleService.Prompt(
-               "Enter the full path to your .NET project or a Git repository URL:",
-               ConsoleColor.Cyan);
+            // Check if Git URL is provided in settings
+            if (!string.IsNullOrWhiteSpace(_gitSettings.RemoteRepositoryUrl))
+            {
+                config.IsBackgroundService = true;
+                SetupGitRepository(config, _gitSettings.RemoteRepositoryUrl);
+            }
+            else
+            {
+                SetupUserInput(config);
+            }
 
-            // Determine if input is a local path or Git URL.
+            SetupFolders(config);
+            LoadSampleUnitTest(config);
+
+            return config;
+        }
+
+        // Setup Git repository from app settings
+        private void SetupGitRepository(ProjectConfigModel config, string projectPath)
+        {
+            config.IsGitRepository = true;
+            config.GitRepositoryUrl = projectPath;
+            config.ProjectPath = _gitSettings.LocalRepositoryPath;
+
+            if (!Directory.Exists(_gitSettings.LocalRepositoryPath))
+            {
+                Directory.CreateDirectory(_gitSettings.LocalRepositoryPath);
+            }
+        }
+
+        // Setup project from user input
+        private void SetupUserInput(ProjectConfigModel config)
+        {
+            config.ProjectPath = _consoleService.Prompt(
+                "Enter the full path to your .NET project or a Git repository URL:",
+                ConsoleColor.Cyan);
+
             if (Directory.Exists(config.ProjectPath))
             {
-                // Local project path.
                 config.IsGitRepository = false;
             }
             else if (config.ProjectPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                      config.ProjectPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                // It's a Git repository URL.
-                config.IsGitRepository = true;
-                config.GitRepositoryUrl = config.ProjectPath;
-                config.ProjectPath = _gitSettings.LocalRepositoryPath;
-
-                // If the directory does not exist, create it.
-                if (!Directory.Exists(_gitSettings.LocalRepositoryPath))
-                {
-                    Directory.CreateDirectory(_gitSettings.LocalRepositoryPath);
-                }
+                SetupGitRepository(config, config.ProjectPath);
             }
             else
             {
-                _consoleService.WriteColored("Invalid input. Please enter a valid local path or a Git repository URL.", ConsoleColor.Red);
-                return Initialize(); // Re-prompt if input is invalid.
-            }
+                _consoleService.WriteColored(
+                    "Invalid input. Please enter a valid local path or a Git repository URL.",
+                    ConsoleColor.Red);
 
-            var srcFolderName = _projectSettings.SourceFolder ?? throw new ArgumentException(nameof(_projectSettings.SourceFolder));
-            var testsFolderName = _projectSettings.TestsFolder ?? throw new ArgumentException(nameof(_projectSettings.TestsFolder));
+                // Re-prompt if input is invalid
+                SetupUserInput(config);
+            }
+        }
+
+        // Setup source and test folders
+        private void SetupFolders(ProjectConfigModel config)
+        {
+            var srcFolderName = _projectSettings.SourceFolder
+                                ?? throw new ArgumentException(nameof(_projectSettings.SourceFolder));
+            var testsFolderName = _projectSettings.TestsFolder
+                                  ?? throw new ArgumentException(nameof(_projectSettings.TestsFolder));
+
             config.SrcFolder = Path.Combine(config.ProjectPath, srcFolderName);
             config.TestsFolder = Path.Combine(config.ProjectPath, testsFolderName);
+        }
 
+        // Load sample unit test (with retry)
+        private void LoadSampleUnitTest(ProjectConfigModel config)
+        {
             if (!string.IsNullOrWhiteSpace(_projectSettings.SampleUnitTest))
             {
                 config.SampleUnitTestContent = File.ReadAllText(_projectSettings.SampleUnitTest);
+                return;
             }
-            else
+            else if (!config.IsBackgroundService)
             {
-                string sampleResponse = _consoleService.Prompt("Would you like to provide a sample unit test file for reference? (Y/N)", ConsoleColor.DarkYellow);
-                int retryCount = 0;
-                int maxRetries = 3; // Limit retries for testability
-                if (sampleResponse.Equals("y", StringComparison.OrdinalIgnoreCase) ||
-                    sampleResponse.Equals("yes", StringComparison.OrdinalIgnoreCase))
-                {
-                    string sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
-                    while ((string.IsNullOrWhiteSpace(sampleFilePath) || !File.Exists(sampleFilePath)) && retryCount < maxRetries)
-                    {
-                        _consoleService.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red);
-                        sampleFilePath = _consoleService.Prompt("Please enter the full path to the sample unit test file:", ConsoleColor.Yellow);
-                        retryCount++;
-                    }
+                string sampleResponse = _consoleService.Prompt(
+                    "Would you like to provide a sample unit test file for reference? (Y/N)",
+                    ConsoleColor.DarkYellow);
 
-                    if (retryCount == maxRetries && string.IsNullOrWhiteSpace(sampleFilePath))
-                    {
-                        _consoleService.WriteColored("Maximum retry limit reached. Skipping sample file selection.", ConsoleColor.Red);
-                        config.SampleUnitTestContent = string.Empty;
-                    }
-                    else
-                    {
-                        config.SampleUnitTestContent = File.ReadAllText(sampleFilePath);
-                    }
-                }
-                else
+                if (!sampleResponse.Equals("y", StringComparison.OrdinalIgnoreCase) &&
+                    !sampleResponse.Equals("yes", StringComparison.OrdinalIgnoreCase))
                 {
                     config.SampleUnitTestContent = string.Empty;
+                    return;
                 }
-            }
 
-            return config;
+                int retryCount = 0;
+                int maxRetries = 3;
+
+                while (retryCount < maxRetries)
+                {
+                    string sampleFilePath = _consoleService.Prompt(
+                        "Please enter the full path to the sample unit test file:",
+                        ConsoleColor.Yellow);
+
+                    if (!string.IsNullOrWhiteSpace(sampleFilePath) && File.Exists(sampleFilePath))
+                    {
+                        config.SampleUnitTestContent = File.ReadAllText(sampleFilePath);
+                        return;
+                    }
+
+                    _consoleService.WriteColored("Invalid file path. Please enter a valid sample unit test file path.", ConsoleColor.Red);
+                    retryCount++;
+                }
+
+                _consoleService.WriteColored("Maximum retry limit reached. Skipping sample file selection.", ConsoleColor.Red);
+                config.SampleUnitTestContent = string.Empty;
+            }
         }
     }
 }

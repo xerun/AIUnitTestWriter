@@ -172,13 +172,13 @@ namespace AIUnitTestWriter.UnitTests.Services
                                .Returns(invalidSampleTestFilePath) // Invalid again
                                .Returns("valid-test.cs"); // Finally valid (but not used in test)
 
-            _mockConsoleService.Setup(m => m.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red));
+            _mockConsoleService.Setup(m => m.WriteColored("Invalid file path. Please enter a valid sample unit test file path.", ConsoleColor.Red));
 
             // Act
             var config = _projectInitializerService.Initialize();
 
             // Assert
-            _mockConsoleService.Verify(m => m.WriteColored("Invalid file path. Please enter a valid sample unit test file path:", ConsoleColor.Red), Times.Exactly(3));
+            _mockConsoleService.Verify(m => m.WriteColored("Invalid file path. Please enter a valid sample unit test file path.", ConsoleColor.Red), Times.Exactly(3));
         }
 
         [Fact]

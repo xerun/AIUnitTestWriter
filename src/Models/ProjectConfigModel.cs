@@ -8,5 +8,6 @@
         public string SampleUnitTestContent { get; set; } = null!;
         public bool IsGitRepository { get; set; }
         public string GitRepositoryUrl { get; set; } = null!;
+        public bool IsBackgroundService { get; set; }
     }
 }

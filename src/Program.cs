@@ -3,11 +3,9 @@ using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
-using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OpenAI.Chat;
 using System.IO.Abstractions;
 
 namespace AIUnitTestWriter
@@ -17,7 +15,7 @@ namespace AIUnitTestWriter
         public static async Task Main(string[] args)
         {
             // Build a host with configuration and DI.
-            var host = Host.CreateDefaultBuilder(args)
+            var hostBuilder = Host.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration((context, config) =>
                 {
                     var env = context.HostingEnvironment.EnvironmentName;
@@ -45,7 +43,6 @@ namespace AIUnitTestWriter
                         var initializer = provider.GetRequiredService<IProjectInitializer>();
                         return initializer.Initialize();
                     });
-
                     services.AddSingleton<IAzureOpenAIClient, AzureOpenAIClientWrapper>();
                     services.AddHttpClient<IHttpClientWrapper, HttpClientWrapper>();
                     services.AddSingleton<IHttpRequestMessageFactory, HttpRequestMessageFactory>();
@@ -66,11 +63,18 @@ namespace AIUnitTestWriter
 
                     // Register the Application runner.
                     services.AddSingleton<AppStarter>();
-                })
-                .Build();
 
-            // Run the application.
-            await host.Services.GetRequiredService<AppStarter>().RunAsync(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
+                    // Register the Worker.
+                    services.AddHostedService<Worker>();
+                });
+
+            var host = hostBuilder.Build();
+
+            // Run as a background service
+            await host.RunAsync();
+
+            // Run as a console app
+            //await host.Services.GetRequiredService<AppStarter>().RunAsync(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
         }
     }
 }

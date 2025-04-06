@@ -1,4 +1,6 @@
-﻿namespace AIUnitTestWriter.Wrappers
+﻿using AIUnitTestWriter.Interfaces;
+
+namespace AIUnitTestWriter.Wrappers
 {
     public class HttpClientWrapper : IHttpClientWrapper
     {

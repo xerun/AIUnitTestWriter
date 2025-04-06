@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using AIUnitTestWriter.Interfaces;
+using System.Net.Http.Headers;
 
 namespace AIUnitTestWriter.Wrappers
 {

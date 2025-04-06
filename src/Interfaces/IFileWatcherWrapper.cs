@@ -1,4 +1,4 @@
-﻿namespace AIUnitTestWriter.Wrappers
+﻿namespace AIUnitTestWriter.Interfaces
 {
     public interface IFileWatcherWrapper
     {
@@ -8,7 +8,7 @@
 
         bool EnableRaisingEvents { get; set; }
 
-        void Start(string path, string filter);
+        void Start(string projectPath, string srcFolder, string filter);
         void Stop();
     }
 }

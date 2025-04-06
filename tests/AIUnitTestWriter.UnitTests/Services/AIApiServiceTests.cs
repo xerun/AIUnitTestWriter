@@ -1,7 +1,7 @@
 ﻿using AIUnitTestWriter.Enum;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Services;
 using AIUnitTestWriter.SettingOptions;
-using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Options;
 using Moq;
 using OpenAI.Chat;

@@ -1,5 +1,8 @@
-﻿using AIUnitTestWriter.Interfaces;
+﻿using AIUnitTestWriter.DTOs;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
+using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Options;
 
 namespace AIUnitTestWriter.Services
 {
@@ -9,13 +12,15 @@ namespace AIUnitTestWriter.Services
         private readonly ICodeMonitor _codeMonitor;
         private readonly IConsoleService _consoleService;
         private readonly ProjectConfigModel _projectConfig;
+        private readonly ProjectSettings _projectSettings;
 
-        public ModeRunnerService(ITestUpdaterService testUpdater, ICodeMonitor codeMonitor, IConsoleService consoleService, ProjectConfigModel projectConfig)
+        public ModeRunnerService(ITestUpdaterService testUpdater, ICodeMonitor codeMonitor, IConsoleService consoleService, ProjectConfigModel projectConfig, IOptions<ProjectSettings> projectSettings)
         {
             _testUpdater = testUpdater ?? throw new ArgumentNullException(nameof(testUpdater));
             _codeMonitor = codeMonitor ?? throw new ArgumentNullException(nameof(codeMonitor));
             _consoleService = consoleService ?? throw new ArgumentNullException(nameof(consoleService));
             _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
+            _projectSettings = projectSettings?.Value ?? throw new ArgumentNullException(nameof(projectSettings));
         }
 
         /// <inheritdoc/>
@@ -24,7 +29,7 @@ namespace AIUnitTestWriter.Services
             _consoleService.WriteColored($"Monitoring source folder: {_projectConfig.SrcFolder}", ConsoleColor.Green);
             _consoleService.WriteColored($"Tests will be updated in: {_projectConfig.TestsFolder}", ConsoleColor.Green);
 
-            await _codeMonitor.StartAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, promptUser: false, cancellationToken);
+            await _codeMonitor.StartAsync(_projectConfig.FilePath, _projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, promptUser: false, cancellationToken);
 
             _consoleService.WriteColored("Auto-detect mode activated. Monitoring code changes, press any key to exit.", ConsoleColor.Blue);
             _consoleService.ReadLine();
@@ -46,7 +51,19 @@ namespace AIUnitTestWriter.Services
                     continue;
                 }
 
-                var result = await _testUpdater.ProcessFileChangeAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, filePath, _projectConfig.SampleUnitTestContent, promptUser: true, cancellationToken);
+                var fileChangeProcessingDto = new FileChangeProcessingDto(
+                    filePath,
+                    oldContent: "",
+                    newContent: "",
+                    codeExtension: _projectSettings.CodeFileExtension,
+                    sampleUnitTest: _projectConfig.SampleUnitTestContent,
+                    promptUser: true,
+                    projectFolder: _projectConfig.FilePath,
+                    srcFolder: _projectConfig.SrcFolder,
+                    testsFolder: _projectConfig.TestsFolder
+                );
+
+                var result = await _testUpdater.ProcessFileChangeAsync(fileChangeProcessingDto, cancellationToken);
                 if (result == null)
                 {
                     continue;

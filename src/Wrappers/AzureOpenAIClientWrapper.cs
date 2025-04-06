@@ -1,4 +1,5 @@
-﻿using AIUnitTestWriter.SettingOptions;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.SettingOptions;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.Options;

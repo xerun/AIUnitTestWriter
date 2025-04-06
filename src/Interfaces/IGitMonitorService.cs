@@ -10,6 +10,6 @@
         /// <summary>
         /// Creates a pull request after detecting and committing changes.
         /// </summary>
-        Task CreatePullRequestAsync(CancellationToken cancellationToken = default);
+        Task CreatePullRequestAsync(string branchName, CancellationToken cancellationToken = default);
     }
 }

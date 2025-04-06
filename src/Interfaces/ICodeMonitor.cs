@@ -5,7 +5,7 @@
         /// <summary>
         /// Starts monitoring the source folder for file changes.
         /// </summary>
-        Task StartAsync(string srcFolder, string testsFolder, string sampleUnitTest = "", bool promptUser = true, CancellationToken cancellationToken = default);
+        Task StartAsync(string projectPath, string srcFolder, string testsFolder, string sampleUnitTest = "", bool promptUser = true, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Stops monitoring and cleans up resources.

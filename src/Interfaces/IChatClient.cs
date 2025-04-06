@@ -1,6 +1,6 @@
 ﻿using OpenAI.Chat;
 
-namespace AIUnitTestWriter.Wrappers
+namespace AIUnitTestWriter.Interfaces
 {
     public interface IChatClient
     {

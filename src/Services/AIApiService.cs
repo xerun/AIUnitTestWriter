@@ -1,7 +1,6 @@
 ﻿using AIUnitTestWriter.Enum;
 using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.SettingOptions;
-using AIUnitTestWriter.Wrappers;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System.Diagnostics.CodeAnalysis;
@@ -84,10 +83,7 @@ namespace AIUnitTestWriter.Services
                 if (choices.GetArrayLength() > 0)
                 {
                     var generatedText = choices[0].GetProperty("text").GetString();
-                    if (!string.IsNullOrWhiteSpace(generatedText))
-                    {
-                        return generatedText.Trim();
-                    }
+                    return ExtractCodeBlock(generatedText);                    
                 }
             }
             return string.Empty;
@@ -124,21 +120,7 @@ namespace AIUnitTestWriter.Services
                 generatedText = doc.RootElement.GetProperty("response").GetString();
             }
 
-            // Remove everything inside <think>...</think> tags if present for reasoning models.
-            if (string.IsNullOrWhiteSpace(generatedText))
-            {
-                return string.Empty;
-            }
-            generatedText = Regex.Replace(generatedText, "<think>.*?</think>", string.Empty, RegexOptions.Singleline).Trim();
-
-            // Extract code between triple backticks if available.
-            var codeBlockMatch = Regex.Match(generatedText, @"```csharp\s*(.*?)```", RegexOptions.Singleline);
-            if (codeBlockMatch.Success)
-            {
-                generatedText = codeBlockMatch.Groups[1].Value.Trim();
-            }
-
-            return generatedText;
+            return ExtractCodeBlock(generatedText);
         }
 
         internal async Task<string> GenerateTestsAzureOpenAIAsync(string prompt, CancellationToken cancellationToken = default)
@@ -158,10 +140,24 @@ namespace AIUnitTestWriter.Services
                     new UserChatMessage(prompt)
                 }, options, cancellationToken);
 
+            return ExtractCodeBlock(generatedText);
+        }
+
+        private string ExtractCodeBlock(string? generatedText)
+        {
             if (string.IsNullOrWhiteSpace(generatedText))
             {
                 return string.Empty;
             }
+
+            generatedText = Regex.Replace(generatedText, "<think>.*?</think>", string.Empty, RegexOptions.Singleline).Trim();
+            // This regex will match any optional language specifier after the triple backticks.
+            var codeBlockMatch = Regex.Match(generatedText, @"```(?:\w+)?\s*(.*?)```", RegexOptions.Singleline);
+            if (codeBlockMatch.Success)
+            {
+                return codeBlockMatch.Groups[1].Value.Trim();
+            }
+
             return generatedText.Trim();
         }
     }

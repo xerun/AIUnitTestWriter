@@ -25,7 +25,7 @@ namespace AIUnitTestWriter.UnitTests.Services
 
             _gitSettings = new GitSettings
             {
-                LocalRepositoryPath = Path.Combine(Path.GetTempPath(), "TestRepo")
+                RemoteRepositoryUrl = "",
             };
 
             var projectSettingsOptions = Options.Create(_projectSettings);
@@ -76,9 +76,6 @@ namespace AIUnitTestWriter.UnitTests.Services
             // Assert
             Assert.True(config.IsGitRepository);
             Assert.Equal(gitRepoUrl, config.GitRepositoryUrl);
-            Assert.Equal(_gitSettings.LocalRepositoryPath, config.ProjectPath);
-            Assert.Equal(Path.Combine(_gitSettings.LocalRepositoryPath, _projectSettings.SourceFolder), config.SrcFolder);
-            Assert.Equal(Path.Combine(_gitSettings.LocalRepositoryPath, _projectSettings.TestsFolder), config.TestsFolder);
             Assert.Empty(config.SampleUnitTestContent);
         }
 
@@ -87,9 +84,6 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             string gitRepoUrl = "https://github.com/test/repo.git";
-
-            if (Directory.Exists(_gitSettings.LocalRepositoryPath))
-                Directory.Delete(_gitSettings.LocalRepositoryPath, true); // Ensure fresh test
 
             _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
                                .Returns(gitRepoUrl);
@@ -101,7 +95,6 @@ namespace AIUnitTestWriter.UnitTests.Services
             var config = _projectInitializerService.Initialize();
 
             // Assert
-            Assert.True(Directory.Exists(_gitSettings.LocalRepositoryPath));
             Assert.True(config.IsGitRepository);
         }
 

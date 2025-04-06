@@ -1,4 +1,5 @@
-﻿using AIUnitTestWriter.Enum;
+﻿using AIUnitTestWriter.DTOs;
+using AIUnitTestWriter.Enum;
 using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services;
@@ -53,13 +54,15 @@ namespace AIUnitTestWriter.UnitTests.Services
         public async Task ProcessFileChange_ShouldSkipFile_ReturnsNull()
         {
             // Arrange
-            var filePath = "Program.cs";
+            var filePath = @"C:\path\to\Program.cs";
             _mockSkippedFilesManager
                 .Setup(x => x.ShouldSkip(filePath))
                 .Returns(true);
+            var fileChangeProcessingDto = FileChangeProcessingDto();
+            fileChangeProcessingDto.FilePath = filePath;
 
             // Act
-            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
+            var result = await _testUpdater.ProcessFileChangeAsync(fileChangeProcessingDto, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.Null(result);
@@ -71,11 +74,12 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\path\to\file.cs";
+            var fileChangeProcessingDto = FileChangeProcessingDto();
             _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             _mockFileSystem.AddFile(filePath, new MockFileData("public interface IMyInterface {}"));
 
             // Act
-            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
+            var result = await _testUpdater.ProcessFileChangeAsync(fileChangeProcessingDto, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.Null(result);
@@ -87,12 +91,13 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\path\to\file.cs";
+            var fileChangeProcessingDto = FileChangeProcessingDto();
             _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             _mockFileSystem.AddFile(filePath, new MockFileData("public class MyClass {}"));
-            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string>());
+            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>(), It.IsAny<string>())).Returns(new List<string>());
 
             // Act
-            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
+            var result = await _testUpdater.ProcessFileChangeAsync(fileChangeProcessingDto, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.Null(result);
@@ -104,6 +109,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\path\to\file.cs";
+            var fileChangeProcessingDto = FileChangeProcessingDto();
             _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             var longSourceCode = @"public class MyClass { public void MyMethod() {} }";
 
@@ -112,12 +118,12 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockFileSystem.AddFile(filePath, new MockFileData(longSourceCode));
 
             _mockConsoleService.Setup(cs => cs.Prompt(It.IsAny<string>(), ConsoleColor.Yellow)).Returns("TestMethod");
-            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
-            _mockCodeAnalyzer.Setup(ca => ca.GetMethodCode(It.IsAny<string>(), "TestMethod")).Returns("public void TestMethod() {}");
+            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>(), It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
+            _mockCodeAnalyzer.Setup(ca => ca.GetMethodCode(It.IsAny<string>(), "TestMethod", It.IsAny<string>())).Returns("public void TestMethod() {}");
             _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>(), _cancellationToken)).ReturnsAsync("Generated Test Code");
 
             // Act
-            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
+            var result = await _testUpdater.ProcessFileChangeAsync(fileChangeProcessingDto, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.NotNull(result);            
@@ -128,15 +134,17 @@ namespace AIUnitTestWriter.UnitTests.Services
         {
             // Arrange
             var filePath = @"C:\src\path\to\file.cs";
+            var fileChangeProcessingDto = FileChangeProcessingDto();
+            fileChangeProcessingDto.FilePath = filePath;
             _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             var sourceCode = "public class MyClass { public void MyMethod() {} }";
             _mockFileSystem.AddFile(filePath, new MockFileData(sourceCode));
-            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
+            _mockCodeAnalyzer.Setup(ca => ca.GetPublicMethodNames(It.IsAny<string>(), It.IsAny<string>())).Returns(new List<string> { "MyMethod" });
 
             _mockAiService.Setup(ai => ai.GenerateTestsAsync(It.IsAny<string>(), _cancellationToken)).ReturnsAsync("Generated Test Code");
 
             // Act
-            var result = await _testUpdater.ProcessFileChangeAsync(@"C:\src", @"C:\tests", filePath, cancellationToken: _cancellationToken);
+            var result = await _testUpdater.ProcessFileChangeAsync(fileChangeProcessingDto, cancellationToken: _cancellationToken);
 
             // Assert
             Assert.NotNull(result);
@@ -162,6 +170,20 @@ namespace AIUnitTestWriter.UnitTests.Services
             Assert.True(_mockFileSystem.FileExists(@"C:\tests\path\to\fileTests.cs"));
             var writtenContent = _mockFileSystem.File.ReadAllText(@"C:\tests\path\to\fileTests.cs");
             Assert.Contains("public class MyTest", writtenContent);
+        }
+
+        private FileChangeProcessingDto FileChangeProcessingDto()
+        {
+            return new FileChangeProcessingDto(
+                filePath: @"C:\path\to\file.cs",
+                oldContent: "old content",
+                newContent: "new content",
+                codeExtension: ".cs",
+                sampleUnitTest: "sample unit test",
+                promptUser: true,
+                srcFolder: @"C:\src",
+                testsFolder: @"C:\tests"
+            );
         }
     }
 }

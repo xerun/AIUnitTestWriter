@@ -1,4 +1,6 @@
-﻿namespace AIUnitTestWriter.Wrappers
+﻿using AIUnitTestWriter.Interfaces;
+
+namespace AIUnitTestWriter.Wrappers
 {
     public class FileWatcherWrapper : IFileWatcherWrapper
     {
@@ -14,8 +16,9 @@
             set => _watcher.EnableRaisingEvents = value;
         }
 
-        public void Start(string path, string filter)
+        public void Start(string projectPath, string srcFolder, string filter)
         {
+            string path = Path.Combine(projectPath, srcFolder);
             _watcher = new FileSystemWatcher(path, filter)
             {
                 IncludeSubdirectories = true,

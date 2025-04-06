@@ -40,6 +40,64 @@ This project is an **AI-driven code monitoring and test updating system** design
 4. **Update Tests** – Calls `TestUpdater`, which uses `IAIApiService` to generate new or modified tests.  
 5. **Create Review Branch** – If monitoring Git, a new branch is created with updated test files for review.  
 
+### A step-by-step guide to set up a GitHub personal access token (PAT) with the correct permissions so your app can:
+
+- Create branches
+- Get commit history
+- Read file content
+- Create pull requests
+
+#### STEP-BY-STEP GUIDE: Create and Configure a GitHub Personal Access Token
+- Choose Your Token Type
+
+GitHub now offers two types of tokens:
+- Classic PAT: Easy to use, global across your account
+- Fine-grained PAT: More secure, repository-specific
+
+For simplicity and full access, you can use Classic PAT, unless you need strict security.
+
+#### OPTION 1: Setup a Classic Personal Access Token
+1. Go to GitHub Token Settings
+👉 https://github.com/settings/tokens
+
+2. Click “Generate new token” → Select “Classic”
+3. Set Expiration and Name
+E.g. AIUnitTestWriter-PAT
+
+4. Select Scopes:
+Make sure to check the following:
+   - repo
+      - Full control of private repositories
+   - workflow (if needed for GitHub Actions)
+   - read:org (optional, if your repo is in an organization)
+
+5. Generate Token
+Save the token somewhere secure – you won’t see it again!
+
+#### OPTION 2: Setup a Fine-Grained Personal Access Token
+More secure, but more config steps
+
+1. Go to:
+👉 https://github.com/settings/personal-access-tokens → Generate new token (fine-grained)
+
+2. Repository Access
+Select:
+
+Only the repository you want to access (or all repos)
+
+3. Set Repository Permissions
+Set the following permissions:
+
+| Category | 	Permission | Level |
+| --- | --- | --- |
+| Contents	| Read and write	| Required
+| Metadata	| Read-only	| Required
+| Pull requests | Read and write	| Required
+| Issues | 	No access	| (optional)
+
+4. Generate Token
+Save the token somewhere secure.
+
 ### **Run the Application**
 - **Console app** - This mode will prompt for user input and start monitoring the local code files.
 - **Background service:** - This mode will automatically start Git branch monitoring and AI-based test generation.

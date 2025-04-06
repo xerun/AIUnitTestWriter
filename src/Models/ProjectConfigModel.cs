@@ -3,6 +3,7 @@
     public class ProjectConfigModel
     {
         public string ProjectPath { get; set; } = null!;
+        public string FilePath { get; set; } = string.Empty;
         public string SrcFolder { get; set; } = null!;
         public string TestsFolder { get; set; } = null!;
         public string SampleUnitTestContent { get; set; } = null!;

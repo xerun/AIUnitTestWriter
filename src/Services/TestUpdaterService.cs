@@ -1,7 +1,9 @@
-﻿using AIUnitTestWriter.Interfaces;
+﻿using AIUnitTestWriter.DTOs;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
 using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
+using Octokit;
 using System.IO.Abstractions;
 
 namespace AIUnitTestWriter.Services
@@ -11,7 +13,7 @@ namespace AIUnitTestWriter.Services
         private readonly IAIApiService _aiService;
         private readonly ICodeAnalyzer _codeAnalyzer;
         private readonly IConsoleService _consoleService;
-        private readonly IFileSystem _fileSystem;        
+        private readonly IFileSystem _fileSystem;
         private readonly ISkippedFilesManager _skippedFilesManager;
         private readonly AISettings _aiSettings;
 
@@ -40,19 +42,19 @@ namespace AIUnitTestWriter.Services
         /// In manual mode, returns a TestGenerationResultModel for approval.
         /// In auto mode, finalizes immediately and returns null.
         /// </summary>
-        public async Task<TestGenerationResultModel?> ProcessFileChangeAsync(string srcFolder, string testsFolder, string filePath, string sampleUnitTest = "", bool promptUser = true, CancellationToken cancellationToken = default)
+        public async Task<TestGenerationResultModel?> ProcessFileChangeAsync(FileChangeProcessingDto dto, CancellationToken cancellationToken = default)
         {
             try
             {
                 // Check if the file is in the predefined skip list
-                if (_skippedFilesManager.ShouldSkip(filePath))
+                if (_skippedFilesManager.ShouldSkip(dto.FilePath))
                 {
-                    _consoleService.WriteColored($"Skipped file (in predefined list): {filePath}", ConsoleColor.DarkGray);
+                    _consoleService.WriteColored($"Skipped file (in predefined list): {dto.FilePath}", ConsoleColor.DarkGray);
                     return null;
                 }
 
                 // Read the source file.
-                var sourceCode = _fileSystem.File.ReadAllText(filePath);
+                var sourceCode = !string.IsNullOrWhiteSpace(dto.NewContent) ? dto.NewContent : _fileSystem.File.ReadAllText(dto.FilePath);
                 if (sourceCode.Contains("interface"))
                 {
                     _consoleService.WriteColored("Skipped interface file.", ConsoleColor.DarkGray);
@@ -60,45 +62,40 @@ namespace AIUnitTestWriter.Services
                 }
 
                 // Analyze the source file for public methods.
-                var publicMethods = _codeAnalyzer.GetPublicMethodNames(sourceCode);
+                var publicMethods = _codeAnalyzer.GetPublicMethodNames(sourceCode, dto.CodeExtension);
                 if (publicMethods?.Count == 0)
                 {
                     _consoleService.WriteColored("No public methods found; skipping test generation.", ConsoleColor.DarkGray);
                     return null;
                 }
 
-                // Optionally, extract just the changed method.
+
                 var methodCodeToSend = sourceCode;
-                string? changedMethodName = null;
-                int sourceLineCount = sourceCode.Split('\n').Length;
+                var codeLines = sourceCode.Split('\n').Where(line => !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith("//")).ToList();
+                int effectiveLineCount = codeLines.Count;
 
-                if (sourceLineCount > SourceLineThreshold)
+                // Extract just the changed method, if lines of code too large.
+                if (effectiveLineCount > SourceLineThreshold && (!string.IsNullOrWhiteSpace(dto.OldContent) && !string.IsNullOrWhiteSpace(dto.NewContent)))
                 {
-                    _consoleService.WriteColored("The source file is very long.", ConsoleColor.Yellow);
-                    changedMethodName = _consoleService.Prompt("Please enter the name of the changed method:", ConsoleColor.Yellow);
-
-                    var extractedMethod = _codeAnalyzer.GetMethodCode(sourceCode, changedMethodName);
-                    if (!string.IsNullOrWhiteSpace(extractedMethod))
+                    var changedLines = _codeAnalyzer.GetChangedLines(dto.OldContent, dto.NewContent);
+                    var affectedMethods = _codeAnalyzer.GetMethodsAroundLines(sourceCode, changedLines, dto.CodeExtension);
+                    if (affectedMethods.Count == 0)
                     {
-                        methodCodeToSend = extractedMethod;
+                        _consoleService.WriteColored("No affected methods found; skipping test generation.", ConsoleColor.DarkGray);
+                        return null;
                     }
-                    else
-                    {
-                        _consoleService.WriteColored("Method not found; using full source.", ConsoleColor.Red);
-                    }
+                    _consoleService.WriteColored("Large file detected. Automatically extracting changed method(s).", ConsoleColor.Yellow);
+                    methodCodeToSend = _codeAnalyzer.GetMethodWithDependencies(sourceCode, affectedMethods, dto.CodeExtension);
                 }
 
                 // Compute the test file path.
-                var relativePath = _fileSystem.Path.GetRelativePath(srcFolder, filePath);
-                var testFilePath = _fileSystem.Path.Combine(testsFolder, relativePath);
-                testFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetDirectoryName(testFilePath),
-                    _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "Tests" + _fileSystem.Path.GetExtension(testFilePath));
+                var testFilePath = TestFilePath(dto);
 
                 // Read any existing tests.
-                var existingTests = _fileSystem.File.Exists(testFilePath) ? _fileSystem.File.ReadAllText(testFilePath) : string.Empty;
+                var existingTests = !string.IsNullOrWhiteSpace(dto.ExistingUnitTest) ? dto.ExistingUnitTest : (_fileSystem.File.Exists(testFilePath) ? _fileSystem.File.ReadAllText(testFilePath) : string.Empty);
 
                 // Build the prompt for the AI.
-                var prompt = GeneratePrompt(methodCodeToSend, existingTests, sampleUnitTest);
+                var prompt = GeneratePrompt(methodCodeToSend, existingTests, dto.SampleUnitTest);
 
                 _consoleService.WriteColored("Sending code to AI for test generation...", ConsoleColor.Blue);
 
@@ -108,15 +105,15 @@ namespace AIUnitTestWriter.Services
                     _consoleService.WriteColored("AI returned an empty response.", ConsoleColor.Yellow);
                     return null;
                 }
-
-                // Write the generated tests to a temporary file.
-                var tempFileName = _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "_temp" + _fileSystem.Path.GetExtension(testFilePath);
-                var tempFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), tempFileName);
-                _fileSystem.File.WriteAllText(tempFilePath, aiResponse);
-                _consoleService.WriteColored($"Generated test file saved to temporary file: {tempFilePath}", ConsoleColor.Green);
-
-                if(_aiSettings.PreviewResult)
+                var tempFilePath = string.Empty;
+                if (_aiSettings.PreviewResult)
                 {
+                    // Write the generated tests to a temporary file.
+                    var tempFileName = _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "_temp" + _fileSystem.Path.GetExtension(testFilePath);
+                    tempFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), tempFileName);
+                    _fileSystem.File.WriteAllText(tempFilePath, aiResponse);
+                    _consoleService.WriteColored($"Generated test file saved to temporary file: {tempFilePath}", ConsoleColor.Green);
+
                     _consoleService.WriteColored("Previewing the generated test file...", ConsoleColor.Blue);
                     try
                     {
@@ -132,7 +129,7 @@ namespace AIUnitTestWriter.Services
                     }
                 }
 
-                if (!promptUser)
+                if (!dto.PromptUser)
                 {
                     var result = new TestGenerationResultModel
                     {
@@ -195,6 +192,26 @@ Existing Tests:
 Provide the complete updated test file content as output.";
 
             return prompt;
+        }
+
+        private string TestFilePath(FileChangeProcessingDto dto)
+        {
+            var testFilePath = string.Empty;
+            if (!dto.PromptUser) {
+                var srcPath = $"{dto.ProjectFolder}/{dto.SrcFolder}";
+                var testPath = $"{dto.ProjectFolder}/{dto.TestsFolder}";
+                var relativePath = _fileSystem.Path.GetRelativePath(srcPath, dto.FilePath);
+                testFilePath = _fileSystem.Path.Combine(testPath, relativePath);
+                testFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetDirectoryName(testFilePath),
+                _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "Tests" + _fileSystem.Path.GetExtension(testFilePath));
+            } else {
+                var relativePath = _fileSystem.Path.GetRelativePath(dto.SrcFolder, dto.FilePath);
+                var relativeTestPath = relativePath.Replace(dto.SrcFolder + Path.DirectorySeparatorChar, dto.TestsFolder + Path.DirectorySeparatorChar);
+                var testFileName = _fileSystem.Path.GetFileNameWithoutExtension(relativeTestPath) + "Tests" + _fileSystem.Path.GetExtension(relativeTestPath);
+                testFilePath = _fileSystem.Path.Combine(dto.TestsFolder, _fileSystem.Path.GetDirectoryName(relativeTestPath), testFileName);
+            }
+
+            return testFilePath;
         }
     }
 }

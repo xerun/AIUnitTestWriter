@@ -1,18 +1,20 @@
-﻿using AIUnitTestWriter.Interfaces;
+﻿using AIUnitTestWriter.DTOs;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.SettingOptions;
-using AIUnitTestWriter.Wrappers;
+using AIUnitTestWriter.Wrappers.Git;
 using Microsoft.Extensions.Options;
 using Moq;
 using Octokit;
+using System.IO.Abstractions;
 
 namespace AIUnitTestWriter.UnitTests.Services
 {
     public class GitMonitorServiceTests
     {
         private readonly CancellationToken _cancellationToken = CancellationToken.None;
-        private readonly Mock<IGitProcessService> _gitProcessServiceMock;
+        private readonly Mock<IFileSystem> _fileSystemMock;
         private readonly Mock<ITestUpdaterService> _testUpdaterMock;
         private readonly Mock<IConsoleService> _consoleServiceMock;
         private readonly Mock<IGitHubClientWrapper> _mockGitHubClientWrapper;
@@ -21,15 +23,15 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly IOptions<ProjectSettings> _projectSettings;
         private readonly IOptions<GitSettings> _gitSettings;
         private readonly ProjectConfigModel _projectConfig;
-        private readonly GitMonitorService _gitService;
+        private readonly GitMonitorService _gitMonitorService;
 
         public GitMonitorServiceTests()
-        {
-            _gitProcessServiceMock = new Mock<IGitProcessService>();
+        {   
             _testUpdaterMock = new Mock<ITestUpdaterService>();
             _consoleServiceMock = new Mock<IConsoleService>();
             _mockGitHubClientWrapper = new Mock<IGitHubClientWrapper>();
             _mockSkippedFilesManager = new Mock<ISkippedFilesManager>();
+            _fileSystemMock = new Mock<IFileSystem>();
             _delayServiceMock = new Mock<IDelayService>();
 
             _projectSettings = Options.Create(new ProjectSettings
@@ -39,7 +41,6 @@ namespace AIUnitTestWriter.UnitTests.Services
 
             _gitSettings = Options.Create(new GitSettings
             {
-                LocalRepositoryPath = "/mock/repo",
                 BranchPrefix = "feature/",
                 GitHubToken = "mock-token",
                 GitMainBranch = "main"
@@ -54,16 +55,16 @@ namespace AIUnitTestWriter.UnitTests.Services
                 SampleUnitTestContent = "Sample Test Content"
             };
 
-            _gitService = new GitMonitorService(
+            _gitMonitorService = new GitMonitorService(
                 _projectSettings,
                 _gitSettings,
                 _projectConfig,
-                _gitProcessServiceMock.Object,
                 _mockGitHubClientWrapper.Object,
                 _testUpdaterMock.Object,
                 _consoleServiceMock.Object,
                 _delayServiceMock.Object,
-                _mockSkippedFilesManager.Object
+                _mockSkippedFilesManager.Object,
+                _fileSystemMock.Object
             );
         }
 
@@ -71,207 +72,136 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Constructor_ShouldThrowException_WhenNull()
         {
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(null, _gitSettings, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, null, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, null, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, null, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _gitProcessServiceMock.Object, null, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, null, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, null, _delayServiceMock.Object, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, null, _mockSkippedFilesManager.Object));
-            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _gitProcessServiceMock.Object, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, null));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(null, _gitSettings, _projectConfig, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, null, _projectConfig, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, null, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, null, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _mockGitHubClientWrapper.Object, null, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, null, _delayServiceMock.Object, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, null, _mockSkippedFilesManager.Object, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, null, _fileSystemMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new GitMonitorService(_projectSettings, _gitSettings, _projectConfig, _mockGitHubClientWrapper.Object, _testUpdaterMock.Object, _consoleServiceMock.Object, _delayServiceMock.Object, _mockSkippedFilesManager.Object, null));
 #pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
         }
 
         [Fact]
-        public async Task MonitorAndTriggerAsync_ShouldCallGitCommands()
+        public async Task MonitorAndTriggerAsync_ShouldDetectNewCommitAndGenerateTests()
         {
             // Arrange
-            var cancellationTokenSource = new CancellationTokenSource();
-            var testGenerationResultModel = new TestGenerationResultModel
+            var commitSha = "123abc";
+            var latestCommit = new GitHubCommit("nodeId", "url", "label", "ref", commitSha, null, null, null, "commentsUrl", null, null, "htmlUrl", null, new List<GitReference>(), new List<GitHubCommitFile>());
+            var gitCommitChange = new GitCommitChange()
             {
-                TestFilePath = @"C:\tests\path\to\fileTests.cs",
-                GeneratedTestCode = "public class MyTest { public void TestMethod() {} }"
+                FilePath = "src/SomeFile.txt",
+                Status = "update",
+                Additions = 1,
+                Deletions = 0
             };
-            var fetchCommandResponse = "Fetched";
-            var pullCommandResponse = "Already up to date.";
-
-            // Set up the mocks for Git commands
-            _gitProcessServiceMock.Setup(x => x.RunCommand("fetch origin", It.IsAny<string>())).Returns(fetchCommandResponse);
-            _gitProcessServiceMock.Setup(x => x.RunCommand("pull origin main", It.IsAny<string>())).Returns(pullCommandResponse);
-
-            // Set up a mock for the GetChangedFiles method to simulate a file change if needed
-            var changedFiles = "/path/test.cs\n"; // Simulate changed .cs file
-            _gitProcessServiceMock.Setup(x => x.RunCommand("diff --name-only HEAD@{1}", It.IsAny<string>())).Returns(changedFiles);
-
-            // Simulate the ProcessFileChange method to not actually run the test updater
-            _testUpdaterMock.Setup(x => x.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), cancellationTokenSource.Token))
-                            .ReturnsAsync(testGenerationResultModel);
-
-            _delayServiceMock.Setup(ds => ds.DelayAsync(It.IsAny<int>(), cancellationTokenSource.Token)).Returns(Task.CompletedTask);
-
-            // Act - Run the MonitorAndTriggerAsync method but only for a single iteration of the loop
-            var monitorTask = Task.Run(() => _gitService.MonitorAndTriggerAsync(cancellationTokenSource.Token));
-
-            // Allow the loop to execute once
-            await Task.Delay(1500); // Increase delay to ensure the loop runs at least once
-
-            cancellationTokenSource.Cancel();  // Cancel after first iteration
-
-            // Assert - Verify that the Git commands are executed
-            _gitProcessServiceMock.Verify(x => x.RunCommand("fetch origin", It.IsAny<string>()), Times.AtLeastOnce);
-            _gitProcessServiceMock.Verify(x => x.RunCommand("pull origin main", It.IsAny<string>()), Times.AtLeastOnce);
-        }
-
-        [Fact]
-        public async Task CreatePullRequestAsync_ShouldCallGitHubApi()
-        {
-            // Arrange
-            var pullRequest = new PullRequest();  // Mock pull request response from GitHub API
-
-            // Mock the Git commands that will be called in the method
-            _gitProcessServiceMock.Setup(x => x.RunCommand(It.IsAny<string>(), It.IsAny<string>())).Returns("Success");
-
-            // Mock the GitHub API client
-            var prMock = new Mock<IPullRequestsClient>();
-            prMock.Setup(x => x.Create(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NewPullRequest>()))
-                  .ReturnsAsync(pullRequest);
-
-            // Set up the mock for GitHub client wrapper (the one being used in the GitService)
-            _mockGitHubClientWrapper.Setup(x => x.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NewPullRequest>(), _cancellationToken))
-                                    .ReturnsAsync(pullRequest);
-            _consoleServiceMock.Setup(x => x.WriteColored(It.IsAny<string>(), It.IsAny<ConsoleColor>()));
-
-            // Ensure that the generated branch name will be in the correct format
-            var expectedBranchName = $"feature/{DateTime.UtcNow:yyyyMMddHHmmss}";  // Create an expected branch name
-            var newPr = new NewPullRequest("Automated Test Update", expectedBranchName, _gitSettings.Value.GitMainBranch)
+            _mockGitHubClientWrapper.Setup(x => x.GetLatestCommitAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken)).ReturnsAsync(latestCommit);
+            _mockGitHubClientWrapper.Setup(x => x.GetCommitChangesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken)).ReturnsAsync(new List<GitCommitChange>
             {
-                Body = "This PR was generated automatically to add/update unit tests for modified files."
-            };
+                gitCommitChange
+            });
+
+            var testGenerationResultModel = new TestGenerationResultModel()
+                {
+                    TempFilePath = "test/SomeClassTests.cs",
+                    GeneratedTestCode = "generated test code"
+                };
+
+            _testUpdaterMock.Setup(x => x.ProcessFileChangeAsync(It.IsAny<FileChangeProcessingDto>(), _cancellationToken)).ReturnsAsync(testGenerationResultModel);
 
             // Act
-            await _gitService.CreatePullRequestAsync();
+            await _gitMonitorService.MonitorAndTriggerAsync(CancellationToken.None);
 
             // Assert
-            // Verify that the correct Git commands are called with the expected arguments
-            _gitProcessServiceMock.Verify(x => x.RunCommand($"checkout -b {expectedBranchName}", It.IsAny<string>()), Times.Once);
-            _gitProcessServiceMock.Verify(x => x.RunCommand("add .", It.IsAny<string>()), Times.Once);
-            _gitProcessServiceMock.Verify(x => x.RunCommand("commit -m \"Automated test update via AI\"", It.IsAny<string>()), Times.Once);
-            _gitProcessServiceMock.Verify(x => x.RunCommand($"push origin {expectedBranchName}", It.IsAny<string>()), Times.Once);
-
-            // Verify the creation of the pull request through the GitHub client mock
-            _mockGitHubClientWrapper.Verify(x => x.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.Is<NewPullRequest>(pr => pr.Body == newPr.Body && pr.Head == expectedBranchName), _cancellationToken), Times.Once);
+            _mockGitHubClientWrapper.Verify(x => x.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken), Times.Once);
+            _mockGitHubClientWrapper.Verify(x => x.CommitFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken), Times.Once);
+            _consoleServiceMock.Verify(x => x.WriteColored(It.IsAny<string>(), It.IsAny<ConsoleColor>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public void EnsureRepoCloned_ShouldCloneRepo_WhenNotFound()
-        {
-            _gitProcessServiceMock.Setup(x => x.RunCommand(It.IsAny<string>(), It.IsAny<string>())).Returns("Cloned");
-
-            if (Directory.Exists("/mock/repo"))
-                Directory.Delete("/mock/repo", true);
-
-            _gitService.EnsureRepoCloned();
-        }
-
-        [Fact]
-        public void GetChangedFiles_ShouldExcludeSkippedFiles()
+        public async Task MonitorAndTriggerAsync_ShouldNotGenerateTests_WhenNoCodeFilesChanged()
         {
             // Arrange
-            _gitProcessServiceMock.Setup(x => x.RunCommand("diff --name-only HEAD@{1}", "/mock/repo"))
-                                  .Returns("file1.cs\nfile2.cs\nfile3.cs");
-
-            // Simulate `ShouldSkip` returning true for file2.cs
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file2.cs")).Returns(true);
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file1.cs")).Returns(false);
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file3.cs")).Returns(false);
+            var commitSha = "123abc";
+            var latestCommit = new GitHubCommit("nodeId", "url", "label", "ref", commitSha, null, null, null, "commentsUrl", null, null, "htmlUrl", null, new List<GitReference>(), new List<GitHubCommitFile>());
+            var gitCommitChange = new GitCommitChange()
+            {
+                FilePath = "src/SomeFile.txt",
+                Status = "update",
+                Additions = 1,
+                Deletions = 0
+            };
+            _mockGitHubClientWrapper.Setup(x => x.GetLatestCommitAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken)).ReturnsAsync(latestCommit);
+            _mockGitHubClientWrapper.Setup(x => x.GetCommitChangesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken)).ReturnsAsync(new List<GitCommitChange>
+            {
+                gitCommitChange
+            });
 
             // Act
-            var changedFiles = _gitService.GetChangedFiles();
+            await _gitMonitorService.MonitorAndTriggerAsync(CancellationToken.None);
 
             // Assert
-            Assert.Contains("file1.cs", changedFiles);
-            Assert.Contains("file3.cs", changedFiles);
-            Assert.DoesNotContain("file2.cs", changedFiles); // Ensure skipped file is excluded
+            _mockGitHubClientWrapper.Verify(x => x.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken), Times.Never);
+            _mockGitHubClientWrapper.Verify(x => x.CommitFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken), Times.Never);
         }
 
         [Fact]
-        public async Task MonitorAndTriggerAsync_ShouldSkipFiles_WhenShouldSkipReturnsTrue()
+        public async Task CreatePullRequestAsync_ShouldCreatePullRequest()
         {
             // Arrange
-            var cancellationTokenSource = new CancellationTokenSource();
+            var branchName = "feature/20250406080000";
             var pullRequest = new PullRequest();
 
-            // Git command responses
-            _gitProcessServiceMock.Setup(x => x.RunCommand("fetch origin", It.IsAny<string>())).Returns("Fetched");
-            _gitProcessServiceMock.Setup(x => x.RunCommand("pull origin main", It.IsAny<string>())).Returns("Pulled");
-
-            // Changed files
-            _gitProcessServiceMock.Setup(x => x.RunCommand("diff --name-only HEAD@{1}", It.IsAny<string>()))
-                                  .Returns("file1.cs\nfile2.cs\nfile3.cs");
-
-            var prMock = new Mock<IPullRequestsClient>();
-            prMock.Setup(x => x.Create(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NewPullRequest>()))
-                  .ReturnsAsync(pullRequest);
-
-            // Set up the mock for GitHub client wrapper (the one being used in the GitService)
-            _mockGitHubClientWrapper.Setup(x => x.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NewPullRequest>(), cancellationTokenSource.Token))
-                                    .ReturnsAsync(pullRequest);
-            _consoleServiceMock.Setup(x => x.WriteColored(It.IsAny<string>(), It.IsAny<ConsoleColor>()));
-
-            // Simulate `ShouldSkip` returning true for file2.cs
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file2.cs")).Returns(true);
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file1.cs")).Returns(false);
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file3.cs")).Returns(false);
-
-            var testGenerationResultModel = new TestGenerationResultModel
-            {
-                TestFilePath = @"C:\tests\path\file1Tests.cs",
-                GeneratedTestCode = "public class MyTest { public void TestMethod() {} }"
-            };
-
-            // TestUpdater mock setup
-            _testUpdaterMock.Setup(x => x.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), cancellationTokenSource.Token))
-                            .ReturnsAsync(testGenerationResultModel);            
-            _delayServiceMock.Setup(ds => ds.DelayAsync(It.IsAny<int>(), cancellationTokenSource.Token)).Returns(Task.CompletedTask);
+            _mockGitHubClientWrapper.Setup(x => x.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NewPullRequest>(), _cancellationToken)).ReturnsAsync(pullRequest);
 
             // Act
-            var monitorTask = Task.Run(() => _gitService.MonitorAndTriggerAsync(cancellationTokenSource.Token));
-            await Task.Delay(1500);
-            cancellationTokenSource.Cancel();
+            await _gitMonitorService.CreatePullRequestAsync(branchName, CancellationToken.None);
 
             // Assert
-            _testUpdaterMock.Verify(x => x.ProcessFileChangeAsync(It.IsAny<string>(), It.IsAny<string>(), "file2.cs", It.IsAny<string>(), It.IsAny<bool>(), cancellationTokenSource.Token), Times.Never);
+            _mockGitHubClientWrapper.Verify(x => x.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NewPullRequest>(), _cancellationToken), Times.Once);
+            _consoleServiceMock.Verify(x => x.WriteColored(It.IsAny<string>(), It.IsAny<ConsoleColor>()), Times.Once);
         }
 
         [Fact]
-        public void GetChangedFiles_ShouldReturnEmpty_WhenAllFilesAreSkipped()
+        public async Task GetChangedFilesAsync_ShouldReturnCorrectFiles()
         {
             // Arrange
-            _gitProcessServiceMock.Setup(x => x.RunCommand("diff --name-only HEAD@{1}", "/mock/repo"))
-                                  .Returns("file1.cs\nfile2.cs\nfile3.cs");
-
-            // Simulate all files being skipped
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file1.cs")).Returns(true);
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file2.cs")).Returns(true);
-            _mockSkippedFilesManager.Setup(x => x.ShouldSkip("file3.cs")).Returns(true);
+            var commitSha = "commit-sha-123";
+            var files = new List<GitCommitChange>
+            {
+                new GitCommitChange()
+                {
+                    FilePath = "src/SomeFile.txt",
+                    Status = "update",
+                    Additions = 1,
+                    Deletions = 0
+                }
+            };
+            _mockGitHubClientWrapper.Setup(x => x.GetCommitChangesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken))
+                .ReturnsAsync(files);
 
             // Act
-            var changedFiles = _gitService.GetChangedFiles();
+            var changedFiles = await _gitMonitorService.GetChangedFilesAsync(commitSha, CancellationToken.None);
 
             // Assert
-            Assert.Empty(changedFiles);
+            Assert.Single(changedFiles);
         }
 
         [Fact]
-        public void RunGitCommand_ShouldCallGitProcessService()
+        public async Task GetExistingUnitTestAsync_ShouldReturnEmptyWhenFileNotFound()
         {
-            _gitProcessServiceMock.Setup(x => x.RunCommand("status", "/mock/repo")).Returns("On branch main");
+            // Arrange
+            var testFilePath = "test/file1Tests.cs";
+            _mockGitHubClientWrapper.Setup(x => x.GetFileContentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), _cancellationToken))
+                .Throws(new FileNotFoundException());
 
-            var result = _gitService.RunGitCommand("status");
+            // Act
+            var result = await _gitMonitorService.GetExistingUnitTestAsync(testFilePath, "commit-sha-123", CancellationToken.None);
 
-            Assert.Equal("On branch main", result);
-            _gitProcessServiceMock.Verify(x => x.RunCommand("status", "/mock/repo"), Times.Once);
+            // Assert
+            Assert.Empty(result);
         }
     }
 }

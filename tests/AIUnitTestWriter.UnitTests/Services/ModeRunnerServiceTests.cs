@@ -1,6 +1,9 @@
-﻿using AIUnitTestWriter.Interfaces;
+﻿using AIUnitTestWriter.DTOs;
+using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
 using AIUnitTestWriter.Services;
+using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace AIUnitTestWriter.UnitTests.Services
@@ -12,6 +15,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly Mock<ICodeMonitor> _mockCodeMonitor;
         private readonly Mock<IConsoleService> _mockConsoleService;
         private readonly ProjectConfigModel _projectConfig;
+        private readonly IOptions<ProjectSettings> _projectSettings;
         private readonly ModeRunnerService _modeRunnerService;
 
         public ModeRunnerServiceTests()
@@ -27,11 +31,17 @@ namespace AIUnitTestWriter.UnitTests.Services
                 SampleUnitTestContent = "Sample test content"
             };
 
+            _projectSettings = Options.Create(new ProjectSettings
+            {
+                CodeFileExtension = ".cs"
+            });
+
             _modeRunnerService = new ModeRunnerService(
                 _mockTestUpdater.Object,
                 _mockCodeMonitor.Object,
                 _mockConsoleService.Object,
-                _projectConfig
+                _projectConfig,
+                _projectSettings
             );
         }
 
@@ -46,7 +56,7 @@ namespace AIUnitTestWriter.UnitTests.Services
             _mockConsoleService.Verify(m => m.WriteColored($"Monitoring source folder: {_projectConfig.SrcFolder}", ConsoleColor.Green), Times.Once);
             _mockConsoleService.Verify(m => m.WriteColored($"Tests will be updated in: {_projectConfig.TestsFolder}", ConsoleColor.Green), Times.Once);
             _mockConsoleService.Verify(m => m.WriteColored("Auto-detect mode activated. Monitoring code changes, press any key to exit.", ConsoleColor.Blue), Times.Once);
-            _mockCodeMonitor.Verify(m => m.StartAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, false, _cancellationToken), Times.Once);
+            _mockCodeMonitor.Verify(m => m.StartAsync(_projectConfig.FilePath, _projectConfig.SrcFolder, _projectConfig.TestsFolder, _projectConfig.SampleUnitTestContent, false, _cancellationToken), Times.Once);
         }
 
         [Fact]
@@ -92,7 +102,7 @@ namespace AIUnitTestWriter.UnitTests.Services
                                .Returns("y") // Approve test update
                                .Returns("exit"); // Exit loop
 
-            _mockTestUpdater.Setup(m => m.ProcessFileChangeAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true, _cancellationToken))
+            _mockTestUpdater.Setup(m => m.ProcessFileChangeAsync(It.IsAny<FileChangeProcessingDto>(), _cancellationToken))
                             .ReturnsAsync(testResult);
 
             // Act
@@ -115,7 +125,7 @@ namespace AIUnitTestWriter.UnitTests.Services
                                .Returns("n") // Reject update
                                .Returns("exit"); // Exit loop
 
-            _mockTestUpdater.Setup(m => m.ProcessFileChangeAsync(_projectConfig.SrcFolder, _projectConfig.TestsFolder, validFilePath, _projectConfig.SampleUnitTestContent, true, _cancellationToken))
+            _mockTestUpdater.Setup(m => m.ProcessFileChangeAsync(It.IsAny<FileChangeProcessingDto>(), _cancellationToken))
                             .ReturnsAsync(testResult);
 
             // Act

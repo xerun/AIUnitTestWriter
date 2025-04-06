@@ -1,4 +1,4 @@
-﻿namespace AIUnitTestWriter.Wrappers
+﻿namespace AIUnitTestWriter.Interfaces
 {
     public interface IHttpRequestMessageFactory
     {

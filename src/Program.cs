@@ -3,6 +3,7 @@ using AIUnitTestWriter.Services;
 using AIUnitTestWriter.Services.Git;
 using AIUnitTestWriter.SettingOptions;
 using AIUnitTestWriter.Wrappers;
+using AIUnitTestWriter.Wrappers.Git;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -71,10 +72,10 @@ namespace AIUnitTestWriter
             var host = hostBuilder.Build();
 
             // Run as a background service
-            await host.RunAsync();
+            //await host.RunAsync();
 
             // Run as a console app
-            //await host.Services.GetRequiredService<AppStarter>().RunAsync(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
+            await host.Services.GetRequiredService<AppStarter>().RunAsync(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
         }
     }
 }

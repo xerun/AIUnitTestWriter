@@ -3,7 +3,6 @@
     public class GitSettings
     {
         public string RemoteRepositoryUrl { get; set; } = null!;
-        public string LocalRepositoryPath { get; set; } = null!;
         public string GitMainBranch { get; set; } = null!;
         public string GitHubToken { get; set; } = null!;
         public string BranchPrefix { get; set; } = null!;

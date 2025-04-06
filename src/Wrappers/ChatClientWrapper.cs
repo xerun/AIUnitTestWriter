@@ -1,4 +1,5 @@
-﻿using OpenAI.Chat;
+﻿using AIUnitTestWriter.Interfaces;
+using OpenAI.Chat;
 
 namespace AIUnitTestWriter.Wrappers
 {

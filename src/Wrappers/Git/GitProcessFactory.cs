@@ -1,7 +1,8 @@
-﻿using AIUnitTestWriter.Services.Git;
+﻿using AIUnitTestWriter.Interfaces;
+using AIUnitTestWriter.Services.Git;
 using System.Diagnostics;
 
-namespace AIUnitTestWriter.Wrappers
+namespace AIUnitTestWriter.Wrappers.Git
 {
     public class GitProcessFactory : IGitProcessFactory
     {

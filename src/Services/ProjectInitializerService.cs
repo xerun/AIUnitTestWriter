@@ -44,12 +44,6 @@ namespace AIUnitTestWriter.Services
         {
             config.IsGitRepository = true;
             config.GitRepositoryUrl = projectPath;
-            config.ProjectPath = _gitSettings.LocalRepositoryPath;
-
-            if (!Directory.Exists(_gitSettings.LocalRepositoryPath))
-            {
-                Directory.CreateDirectory(_gitSettings.LocalRepositoryPath);
-            }
         }
 
         // Setup project from user input
@@ -87,8 +81,9 @@ namespace AIUnitTestWriter.Services
             var testsFolderName = _projectSettings.TestsFolder
                                   ?? throw new ArgumentException(nameof(_projectSettings.TestsFolder));
 
-            config.SrcFolder = Path.Combine(config.ProjectPath, srcFolderName);
-            config.TestsFolder = Path.Combine(config.ProjectPath, testsFolderName);
+            config.FilePath = config.ProjectPath;
+            config.SrcFolder = srcFolderName;
+            config.TestsFolder = testsFolderName;
         }
 
         // Load sample unit test (with retry)

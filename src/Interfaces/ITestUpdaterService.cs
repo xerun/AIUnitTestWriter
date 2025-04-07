@@ -6,8 +6,10 @@ namespace AIUnitTestWriter.Interfaces
     public interface ITestUpdaterService
     {
         /// <summary>
-        /// Processes the changed file and returns a TestGenerationResultModel in manual mode.
-        /// In auto mode, finalizes the update immediately and returns null.
+        /// Processes the changed file. If the file is very long, it prompts for the changed method,
+        /// then only that method (and its dependencies, if desired) is fed to the AI.
+        /// In manual mode, returns a TestGenerationResultModel for approval.
+        /// In auto mode, finalizes immediately and returns null.
         /// </summary>
         Task<TestGenerationResultModel?> ProcessFileChangeAsync(FileChangeProcessingDto dto, CancellationToken cancellationToken = default);
 

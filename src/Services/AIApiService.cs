@@ -1,6 +1,7 @@
 ﻿using AIUnitTestWriter.Enum;
 using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System.Diagnostics.CodeAnalysis;
@@ -15,6 +16,7 @@ namespace AIUnitTestWriter.Services
         private readonly IHttpClientWrapper _httpClient;
         private readonly IHttpRequestMessageFactory _requestFactory;
         private readonly IAzureOpenAIClient _openAIClient;
+        private readonly ILogger<AIApiService> _logger;
         private readonly AISettings _aiSettings;
         private readonly string _apiKey;
         private readonly string _endpoint;
@@ -23,12 +25,13 @@ namespace AIUnitTestWriter.Services
         private readonly float _temperature;
         private readonly AIProvider _provider;
 
-        public AIApiService(IOptions<AISettings> aiSettings, IHttpClientWrapper httpClientWrapper, IHttpRequestMessageFactory requestFactory, IAzureOpenAIClient openAIClient)
+        public AIApiService(IOptions<AISettings> aiSettings, IHttpClientWrapper httpClientWrapper, IHttpRequestMessageFactory requestFactory, IAzureOpenAIClient openAIClient, ILogger<AIApiService> logger)
         {
             _httpClient = httpClientWrapper ?? throw new ArgumentNullException(nameof(httpClientWrapper));
             _requestFactory = requestFactory ?? throw new ArgumentNullException(nameof(requestFactory));
             _aiSettings = aiSettings?.Value ?? throw new ArgumentNullException(nameof(aiSettings));
             _openAIClient = openAIClient ?? throw new ArgumentNullException(nameof(openAIClient));
+            _logger = logger;
 
             _apiKey = _aiSettings.ApiKey;
             _provider = _aiSettings.Provider;
@@ -70,7 +73,7 @@ namespace AIUnitTestWriter.Services
             var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"OpenAI API request failed: {response.StatusCode}");
+                _logger.LogWarning($"OpenAI API request failed: {response.StatusCode}");
                 return string.Empty;
             }
 
@@ -108,7 +111,7 @@ namespace AIUnitTestWriter.Services
             var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Ollama API request failed: {response.StatusCode}");
+                _logger.LogWarning($"Ollama API request failed: {response.StatusCode}");
                 return string.Empty;
             }
 
@@ -118,9 +121,8 @@ namespace AIUnitTestWriter.Services
             using (var doc = JsonDocument.Parse(jsonResponse))
             {
                 generatedText = doc.RootElement.GetProperty("response").GetString();
+                return ExtractCodeBlock(generatedText);
             }
-
-            return ExtractCodeBlock(generatedText);
         }
 
         internal async Task<string> GenerateTestsAzureOpenAIAsync(string prompt, CancellationToken cancellationToken = default)

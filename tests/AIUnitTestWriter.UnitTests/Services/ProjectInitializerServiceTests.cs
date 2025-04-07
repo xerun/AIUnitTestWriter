@@ -38,7 +38,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Initialize_Should_SetupLocalProject_When_ValidLocalPathProvided()
         {
             // Arrange
-            string localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
+            var localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");            
             Directory.CreateDirectory(localProjectPath); // Ensure the directory exists
 
             _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
@@ -49,12 +49,14 @@ namespace AIUnitTestWriter.UnitTests.Services
 
             // Act
             var config = _projectInitializerService.Initialize();
+            var srcFolder = Path.Combine(localProjectPath, config.SrcFolder);
+            var testFolder = Path.Combine(localProjectPath, config.TestsFolder);
 
             // Assert
             Assert.Equal(localProjectPath, config.ProjectPath);
             Assert.False(config.IsGitRepository);
-            Assert.Equal(Path.Combine(localProjectPath, _projectSettings.SourceFolder), config.SrcFolder);
-            Assert.Equal(Path.Combine(localProjectPath, _projectSettings.TestsFolder), config.TestsFolder);
+            Assert.Equal(Path.Combine(localProjectPath, _projectSettings.SourceFolder), srcFolder);
+            Assert.Equal(Path.Combine(localProjectPath, _projectSettings.TestsFolder), testFolder);
             Assert.Empty(config.SampleUnitTestContent);
         }
 
@@ -62,7 +64,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Initialize_Should_SetupGitRepository_When_ValidGitUrlProvided()
         {
             // Arrange
-            string gitRepoUrl = "https://github.com/test/repo.git";
+            var gitRepoUrl = "https://github.com/test/repo.git";
 
             _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
                                .Returns(gitRepoUrl);
@@ -83,7 +85,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Initialize_Should_CreateGitRepositoryDirectory_If_NotExists()
         {
             // Arrange
-            string gitRepoUrl = "https://github.com/test/repo.git";
+            var gitRepoUrl = "https://github.com/test/repo.git";
 
             _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
                                .Returns(gitRepoUrl);
@@ -123,10 +125,10 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Initialize_Should_Set_SampleUnitTestContent_When_ValidFileProvided()
         {
             // Arrange
-            string localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
+            var localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
             Directory.CreateDirectory(localProjectPath);
 
-            string sampleTestFilePath = Path.Combine(Path.GetTempPath(), "SampleTest.cs");
+            var sampleTestFilePath = Path.Combine(Path.GetTempPath(), "SampleTest.cs");
             File.WriteAllText(sampleTestFilePath, "Sample Unit Test Content");
 
             _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
@@ -149,10 +151,10 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Initialize_Should_Reprompt_When_InvalidSampleFilePathProvided()
         {
             // Arrange
-            string localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
+            var localProjectPath = Path.Combine(Path.GetTempPath(), "LocalProject");
             Directory.CreateDirectory(localProjectPath);
 
-            string invalidSampleTestFilePath = Path.Combine(Path.GetTempPath(), "InvalidSampleTest.cs");
+            var invalidSampleTestFilePath = Path.Combine(Path.GetTempPath(), "InvalidSampleTest.cs");
 
             _mockConsoleService.Setup(m => m.Prompt(It.IsAny<string>(), ConsoleColor.Cyan))
                                .Returns(localProjectPath);

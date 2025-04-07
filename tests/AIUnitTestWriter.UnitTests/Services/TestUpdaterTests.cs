@@ -75,6 +75,7 @@ namespace AIUnitTestWriter.UnitTests.Services
             // Arrange
             var filePath = @"C:\path\to\file.cs";
             var fileChangeProcessingDto = FileChangeProcessingDto();
+            fileChangeProcessingDto.NewContent = "public interface IMyInterface {}";
             _mockSkippedFilesManager.Setup(x => x.ShouldSkip(filePath)).Returns(false);
             _mockFileSystem.AddFile(filePath, new MockFileData("public interface IMyInterface {}"));
 

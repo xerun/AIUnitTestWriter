@@ -2,6 +2,7 @@
 using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Services;
 using AIUnitTestWriter.SettingOptions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using OpenAI.Chat;
@@ -19,6 +20,7 @@ namespace AIUnitTestWriter.UnitTests.Services
         private readonly Mock<IAzureOpenAIClient> _openAIClientMock;
         private readonly Mock<IChatClient> _chatClientMock;
         private readonly IOptions<AISettings> _aiSettings;
+        private readonly Mock<ILogger<AIApiService>> _loggerMock;
         private readonly AIApiService _service;
 
         public AIApiServiceTests()
@@ -37,11 +39,12 @@ namespace AIUnitTestWriter.UnitTests.Services
             _requestFactoryMock = new Mock<IHttpRequestMessageFactory>();
             _openAIClientMock = new Mock<IAzureOpenAIClient>();
             _chatClientMock = new Mock<IChatClient>();
+            _loggerMock = new Mock<ILogger<AIApiService>>();
             _openAIClientMock
                 .Setup(x => x.GetChatClient(_aiSettings.Value.Model))
                 .Returns(_chatClientMock.Object);
 
-            _service = new AIApiService(_aiSettings, _httpClientMock.Object, _requestFactoryMock.Object, _openAIClientMock.Object);
+            _service = new AIApiService(_aiSettings, _httpClientMock.Object, _requestFactoryMock.Object, _openAIClientMock.Object, _loggerMock.Object);
         }
 
         #region Constructor Tests
@@ -50,10 +53,10 @@ namespace AIUnitTestWriter.UnitTests.Services
         public void Constructor_ShouldThrowException_WhenNull()
         {
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
-            Assert.Throws<ArgumentNullException>(() => new AIApiService(null, _httpClientMock.Object, _requestFactoryMock.Object, _openAIClientMock.Object));
-            Assert.Throws<ArgumentNullException>(() => new AIApiService(_aiSettings, null, _requestFactoryMock.Object, _openAIClientMock.Object));
-            Assert.Throws<ArgumentNullException>(() => new AIApiService(_aiSettings, _httpClientMock.Object, null, _openAIClientMock.Object));
-            Assert.Throws<ArgumentNullException>(() => new AIApiService(_aiSettings, _httpClientMock.Object, _requestFactoryMock.Object, null));
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(null, _httpClientMock.Object, _requestFactoryMock.Object, _openAIClientMock.Object, _loggerMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(_aiSettings, null, _requestFactoryMock.Object, _openAIClientMock.Object, _loggerMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(_aiSettings, _httpClientMock.Object, null, _openAIClientMock.Object, _loggerMock.Object));
+            Assert.Throws<ArgumentNullException>(() => new AIApiService(_aiSettings, _httpClientMock.Object, _requestFactoryMock.Object, null, _loggerMock.Object));
 #pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
         }
         #endregion

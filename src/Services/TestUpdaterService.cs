@@ -3,7 +3,6 @@ using AIUnitTestWriter.Interfaces;
 using AIUnitTestWriter.Models;
 using AIUnitTestWriter.SettingOptions;
 using Microsoft.Extensions.Options;
-using Octokit;
 using System.IO.Abstractions;
 
 namespace AIUnitTestWriter.Services
@@ -16,9 +15,7 @@ namespace AIUnitTestWriter.Services
         private readonly IFileSystem _fileSystem;
         private readonly ISkippedFilesManager _skippedFilesManager;
         private readonly AISettings _aiSettings;
-
         private const int SourceLineThreshold = 300;
-        private const int TestLineThreshold = 300;
 
         public TestUpdaterService(
             IAIApiService aiService,
@@ -36,12 +33,7 @@ namespace AIUnitTestWriter.Services
             _aiSettings = aiSettings?.Value ?? throw new ArgumentNullException(nameof(aiSettings));
         }
 
-        /// <summary>
-        /// Processes the changed file. If the file is very long, it prompts for the changed method,
-        /// then only that method (and its dependencies, if desired) is fed to the AI.
-        /// In manual mode, returns a TestGenerationResultModel for approval.
-        /// In auto mode, finalizes immediately and returns null.
-        /// </summary>
+        /// <inheritdoc/>
         public async Task<TestGenerationResultModel?> ProcessFileChangeAsync(FileChangeProcessingDto dto, CancellationToken cancellationToken = default)
         {
             try
@@ -160,15 +152,20 @@ namespace AIUnitTestWriter.Services
             }
         }
 
-        /// <summary>
-        /// Finalizes the test update by writing the generated code to the test file.
-        /// </summary>
+        /// <inheritdoc/>
         public void FinalizeTestUpdate(TestGenerationResultModel result)
         {
             _fileSystem.Directory.CreateDirectory(_fileSystem.Path.GetDirectoryName(result.TestFilePath));
             _fileSystem.File.WriteAllText(result.TestFilePath, result.GeneratedTestCode);
         }
 
+        /// <summary>
+        /// Generates the prompt for the AI based on the method code, existing tests, and sample unit test.
+        /// </summary>
+        /// <param name="methodCode"></param>
+        /// <param name="existingTests"></param>
+        /// <param name="sampleUnitTest"></param>
+        /// <returns></returns>
         private string GeneratePrompt(string methodCode, string existingTests, string sampleUnitTest)
         {
             var prompt = $@"{_aiSettings.Prompt}";
@@ -194,24 +191,32 @@ Provide the complete updated test file content as output.";
             return prompt;
         }
 
+        /// <summary>
+        /// Generates the test file path based on the source file path and project structure.
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         private string TestFilePath(FileChangeProcessingDto dto)
         {
-            var testFilePath = string.Empty;
-            if (!dto.PromptUser) {
-                var srcPath = $"{dto.ProjectFolder}/{dto.SrcFolder}";
-                var testPath = $"{dto.ProjectFolder}/{dto.TestsFolder}";
-                var relativePath = _fileSystem.Path.GetRelativePath(srcPath, dto.FilePath);
-                testFilePath = _fileSystem.Path.Combine(testPath, relativePath);
-                testFilePath = _fileSystem.Path.Combine(_fileSystem.Path.GetDirectoryName(testFilePath),
-                _fileSystem.Path.GetFileNameWithoutExtension(testFilePath) + "Tests" + _fileSystem.Path.GetExtension(testFilePath));
-            } else {
-                var relativePath = _fileSystem.Path.GetRelativePath(dto.SrcFolder, dto.FilePath);
-                var relativeTestPath = relativePath.Replace(dto.SrcFolder + Path.DirectorySeparatorChar, dto.TestsFolder + Path.DirectorySeparatorChar);
-                var testFileName = _fileSystem.Path.GetFileNameWithoutExtension(relativeTestPath) + "Tests" + _fileSystem.Path.GetExtension(relativeTestPath);
-                testFilePath = _fileSystem.Path.Combine(dto.TestsFolder, _fileSystem.Path.GetDirectoryName(relativeTestPath), testFileName);
+            string relativePath;
+            string testRoot;
+
+            if (!dto.PromptUser)
+            {
+                var srcPath = _fileSystem.Path.Combine(dto.ProjectFolder, dto.SrcFolder);
+                var testPath = _fileSystem.Path.Combine(dto.ProjectFolder, dto.TestsFolder);
+                relativePath = _fileSystem.Path.GetRelativePath(srcPath, dto.FilePath);
+                testRoot = testPath;
+            }
+            else
+            {
+                relativePath = _fileSystem.Path.GetRelativePath(dto.SrcFolder, dto.FilePath);
+                testRoot = dto.TestsFolder;
             }
 
-            return testFilePath;
+            var testFileName = _fileSystem.Path.GetFileNameWithoutExtension(relativePath) + "Tests" + _fileSystem.Path.GetExtension(relativePath);
+            var testDir = _fileSystem.Path.GetDirectoryName(relativePath);
+            return _fileSystem.Path.Combine(testRoot, testDir, testFileName);
         }
     }
 }
